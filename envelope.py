@@ -29,6 +29,12 @@ from engine3 import (
 R_GAS = 10.7316
 WILSON_C = np.log(10.0) * (7.0/3.0)   # ≈ 5.3727 (igual que el Excel)
 
+# Límites físicos para el GoalSeek — evita divergencia cerca del punto crítico
+_T_MIN = 20.0          # °R mínimo
+_T_MAX_FACTOR = 1.8    # × Tc_max de la mezcla
+_P_MIN = 1.0           # psia mínimo
+_P_MAX_FACTOR = 1.5    # × Pc_max de la mezcla
+
 def Ki_wilson(i, T, P):
     return (PC[i]/P) * np.exp(WILSON_C*(1+OMEGA[i])*(1-TC[i]/T))
 
@@ -76,17 +82,17 @@ def obj_rocio(T, P, z, x_fija, kij):
     return sum(z[i]/Ki[i] if Ki[i]>1e-30 else 1e30 for i in range(NC)) - 1.0, Ki
 
 # ── GoalSeek tipo Excel: búsqueda LOCAL con método secante ───
-def goalseek_secant(f, x0, tol=1e-7, max_it=120, x_min=0.01):
+def goalseek_secant(f, x0, tol=1e-7, max_it=120,
+                    x_min=0.01, x_max=None):
     """
     Replica el GoalSeek de Excel: parte del valor actual x0 y busca
-    la raíz MÁS CERCANA mediante secante. NO hace búsqueda global,
-    por eso no cae en la solución trivial (Ki=1).
+    la raíz MÁS CERCANA mediante secante. NO hace búsqueda global.
+    x_min y x_max son límites físicos — rechaza resultados fuera de rango.
     """
     f0 = f(x0)
     if not np.isfinite(f0): return None
     if abs(f0) < tol: return x0
 
-    # Paso inicial pequeño relativo al valor
     dx = max(abs(x0)*0.02, 0.05)
     x_prev, f_prev = x0, f0
     x_cur = x0 + dx
@@ -98,6 +104,9 @@ def goalseek_secant(f, x0, tol=1e-7, max_it=120, x_min=0.01):
 
     for _ in range(max_it):
         if abs(f_cur) < tol:
+            # Verificar límites físicos antes de aceptar
+            if x_max is not None and x_cur > x_max: return None
+            if x_cur < x_min: return None
             return x_cur
         denom = (f_cur - f_prev)
         if abs(denom) < 1e-30:
@@ -106,8 +115,8 @@ def goalseek_secant(f, x0, tol=1e-7, max_it=120, x_min=0.01):
         # Limitar saltos extremos (estabilidad)
         if x_new <= x_min:
             x_new = max(x_cur*0.5, x_min)
-        elif x_new > x_cur*5 and x_cur > 0:
-            x_new = x_cur*5
+        if x_max is not None and x_new > x_max:
+            x_new = min(x_cur*2.0, x_max)
         f_new = f(x_new)
         if not np.isfinite(f_new):
             x_new = (x_cur + x_prev)/2.0
@@ -116,33 +125,39 @@ def goalseek_secant(f, x0, tol=1e-7, max_it=120, x_min=0.01):
         x_prev, f_prev = x_cur, f_cur
         x_cur, f_cur = x_new, f_new
 
+    # Verificar límites físicos en el resultado final
+    if x_max is not None and x_cur > x_max: return None
+    if x_cur < x_min: return None
     return x_cur if abs(f_cur) < tol*50 else None
 
 # ── Encontrar punto de saturación (réplica EncontrarPuntoSat) ──
 def encontrar_punto(tipo, var_it, T_in, P_in, comp_fija_in, z, kij,
-                    tol_comp=1e-7, max_ext=200):
+                    tol_comp=1e-9, max_ext=1000):
     """
     tipo: 'B' burbuja, 'D' rocío
     var_it: 'P' (GoalSeek mueve P) o 'T' (GoalSeek mueve T)
     comp_fija_in: composición iterada inicial (Yi burbuja / Xi rocío)
     Retorna: (T, P, Ki, comp_fija, exito)
+    Tolerancias iguales al Excel: tol_comp=1e-9, max_ext=1000
     """
     T, P = T_in, P_in
     comp = list(comp_fija_in)
     obj = obj_burbuja if tipo=='B' else obj_rocio
     comp_ant = None
-    Tmax = sum(z[i]*TC[i] for i in range(NC)) * 2.0
+    # Límites físicos basados en las propiedades críticas de la mezcla
+    Tc_max = max(TC) * _T_MAX_FACTOR
+    Pc_max = max(PC) * _P_MAX_FACTOR
 
     for _ in range(max_ext):
-        # GoalSeek con composición FIJA (búsqueda local desde valor actual)
+        # GoalSeek con composición FIJA y límites físicos
         if var_it == 'P':
             f = lambda p: obj(T, p, z, comp, kij)[0]
-            P_new = goalseek_secant(f, P)
+            P_new = goalseek_secant(f, P, x_min=_P_MIN, x_max=Pc_max)
             if P_new is None: return T, P, comp, comp, False
             P = P_new
         else:
             f = lambda t: obj(t, P, z, comp, kij)[0]
-            T_new = goalseek_secant(f, T)
+            T_new = goalseek_secant(f, T, x_min=_T_MIN, x_max=Tc_max)
             if T_new is None: return T, P, comp, comp, False
             T = T_new
 
@@ -185,8 +200,8 @@ def crit_check(Ki, th=0.01):
 
 # ══════════════════════════════════════════════════════════════
 def _curva(tipo, z, kij, dT=5, dP=5, dT_min=2, dP_min=2,
-           fac=0.5, tol=1e-7, max_it=200,
-           max_pts=400, crit_th=0.01, max_int=10, cb=None):
+           fac=0.5, tol=1e-9, max_it=1000,
+           max_pts=500, crit_th=0.001, max_int=10, cb=None):
 
     P0 = 10.0
     # T inicial por Newton-Wilson (columna D del Excel)
