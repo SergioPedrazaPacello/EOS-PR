@@ -199,9 +199,9 @@ def crit_check(Ki, th=0.01):
     return sum((k-1)**2 for k in Ki) < th
 
 # ══════════════════════════════════════════════════════════════
-def _curva(tipo, z, kij, dT=5, dP=5, dT_min=2, dP_min=2,
+def _curva(tipo, z, kij, dT=5, dP=5, dT_min=1.0, dP_min=1.0,
            fac=0.5, tol=1e-9, max_it=1000,
-           max_pts=500, crit_th=0.001, max_int=10, cb=None):
+           max_pts=700, crit_th=0.0005, max_int=10, cb=None):
 
     P0 = 10.0
     # T inicial por Newton-Wilson (columna D del Excel)
@@ -286,6 +286,102 @@ def curva_rocio(z,kij=None,progress_cb=None,**kw):
     if kij is None: kij=copy.deepcopy(KIJ_DEFAULT)
     return _curva('D',z,kij,cb=progress_cb,**kw)
 
+
+def _cerrar_envolvente(burb, rocio, n_interp=20):
+    """
+    Cierra visualmente la envolvente interpolando entre el último punto
+    de burbuja y el último punto de rocío, pasando por un punto crítico
+    estimado por extrapolación de las tendencias de ambas curvas.
+
+    Los puntos interpolados se agregan a AMBAS curvas (mitad a cada una)
+    para que la envolvente quede cerrada con puntos idénticos a los
+    calculados. Retorna (burb_cerrada, rocio_cerrada).
+    """
+    if len(burb) < 3 or len(rocio) < 3:
+        return burb, rocio
+
+    # Extremos abiertos (últimos puntos calculados de cada rama)
+    Pb_end, Tb_end = burb[-1]
+    Pd_end, Td_end = rocio[-1]
+
+    import math
+    dist = math.sqrt((Pb_end-Pd_end)**2 + (Tb_end-Td_end)**2)
+    # Si los extremos ya están casi pegados, no hace falta cerrar
+    if dist < 1.0:
+        return burb, rocio
+
+    # Estimar punto crítico por extrapolación de las tangentes de cada rama.
+    # Tangente de burbuja (dirección de los últimos 2-3 puntos)
+    def tangente(pts, n=3):
+        n = min(n, len(pts))
+        p0 = pts[-n]; p1 = pts[-1]
+        dP = p1[0]-p0[0]; dT = p1[1]-p0[1]
+        norm = math.sqrt(dP*dP + dT*dT)
+        if norm < 1e-9: return (0.0, 0.0)
+        return (dP/norm, dT/norm)
+
+    tb = tangente(burb)   # dirección saliente de burbuja
+    td = tangente(rocio)  # dirección saliente de rocío
+
+    # Punto crítico estimado: intersección aproximada de las dos tangentes
+    # extendidas desde los extremos. Si no se cruzan limpiamente, usar
+    # el punto medio elevado (el crítico suele estar por encima de ambos
+    # extremos en una envolvente típica).
+    Pc_est = None; Tc_est = None
+    # Resolver: Pb_end + s*tb = Pd_end + u*td  (en plano P-T)
+    denom = tb[0]*(-td[1]) - tb[1]*(-td[0])
+    if abs(denom) > 1e-9:
+        rhsP = Pd_end - Pb_end
+        rhsT = Td_end - Tb_end
+        s = (rhsP*(-td[1]) - rhsT*(-td[0])) / denom
+        # Punto de intersección sobre la tangente de burbuja
+        Pc_int = Pb_end + s*tb[0]
+        Tc_int = Tb_end + s*tb[1]
+        # Aceptar solo si la intersección está "adelante" y es razonable
+        # (no demasiado lejos de los extremos)
+        max_reach = dist * 2.5
+        if (s > 0 and
+            math.sqrt((Pc_int-Pb_end)**2+(Tc_int-Tb_end)**2) < max_reach):
+            Pc_est, Tc_est = Pc_int, Tc_int
+
+    if Pc_est is None:
+        # Respaldo: punto medio entre extremos, ligeramente elevado en P
+        Pc_est = (Pb_end + Pd_end)/2.0
+        Tc_est = (Tb_end + Td_end)/2.0
+        # Elevar un poco hacia donde apuntan las tangentes promedio
+        Pc_est += (tb[0]+td[0])/2.0 * dist*0.4
+        Tc_est += (tb[1]+td[1])/2.0 * dist*0.4
+
+    # Generar curva suave: burbuja_end → crítico → rocío_end
+    # mediante Bézier cuadrática con el crítico como punto de control.
+    def bezier(p0, pc, p1, t):
+        mt = 1-t
+        x = mt*mt*p0[0] + 2*mt*t*pc[0] + t*t*p1[0]
+        y = mt*mt*p0[1] + 2*mt*t*pc[1] + t*t*p1[1]
+        return (x, y)
+
+    p0 = (Pb_end, Tb_end)
+    pc = (Pc_est, Tc_est)
+    p1 = (Pd_end, Td_end)
+
+    # Puntos interpolados (excluyendo extremos que ya existen)
+    interp = []
+    for k in range(1, n_interp):
+        t = k/float(n_interp)
+        P_i, T_i = bezier(p0, pc, p1, t)
+        interp.append((P_i, T_i))
+
+    # Repartir: primera mitad se agrega a burbuja, segunda mitad a rocío
+    # (invertida para mantener continuidad), de modo que ambas curvas
+    # avancen hacia el crítico con puntos idénticos.
+    mid = len(interp)//2
+    burb_extra  = interp[:mid]
+    rocio_extra = list(reversed(interp[mid:]))
+
+    burb_cerrada  = list(burb)  + burb_extra
+    rocio_cerrada = list(rocio) + rocio_extra
+    return burb_cerrada, rocio_cerrada
+
 def curva_envolvente(z,kij=None,progress_cb=None):
     if kij is None: kij=copy.deepcopy(KIJ_DEFAULT)
     def cb_b(n):
@@ -294,4 +390,6 @@ def curva_envolvente(z,kij=None,progress_cb=None):
         if progress_cb: progress_cb('rocio',n)
     pb,cb=curva_burbuja(z,kij,progress_cb=cb_b)
     pd,cd=curva_rocio(z,kij,progress_cb=cb_d)
+    # Cerrar visualmente la envolvente interpolando hacia el punto crítico
+    pb,pd = _cerrar_envolvente(pb, pd)
     return {'burbuja':pb,'rocio':pd,'critico_burbuja':cb,'critico_rocio':cd}
