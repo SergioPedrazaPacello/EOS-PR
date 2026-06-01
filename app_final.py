@@ -764,10 +764,47 @@ class MainWindow(QMainWindow):
             f"R = {R_GAS} psi·ft³/(lb-mol·°R)  |  13 componentes")
         self.setStatusBar(sb)
 
+# QSS para que los scrollbars conserven el aspecto nativo de Windows
+# (Fusion cambiaría los scrollbars; este estilo los devuelve al look clásico)
+_SCROLLBAR_QSS = """
+QScrollBar:vertical {
+    background: #F0F0F0; width: 17px; margin: 0px;
+    border-left: 1px solid #D0D0D0;
+}
+QScrollBar::handle:vertical {
+    background: #CDCDCD; min-height: 20px; border-radius: 0px;
+}
+QScrollBar::handle:vertical:hover { background: #A6A6A6; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    background: #F0F0F0; height: 17px; border: 1px solid #D0D0D0;
+    subcontrol-origin: margin;
+}
+QScrollBar::sub-line:vertical { subcontrol-position: top; }
+QScrollBar::add-line:vertical { subcontrol-position: bottom; }
+QScrollBar:horizontal {
+    background: #F0F0F0; height: 17px; margin: 0px;
+    border-top: 1px solid #D0D0D0;
+}
+QScrollBar::handle:horizontal {
+    background: #CDCDCD; min-width: 20px; border-radius: 0px;
+}
+QScrollBar::handle:horizontal:hover { background: #A6A6A6; }
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    background: #F0F0F0; width: 17px; border: 1px solid #D0D0D0;
+    subcontrol-origin: margin;
+}
+QScrollBar::sub-line:horizontal { subcontrol-position: left; }
+QScrollBar::add-line:horizontal { subcontrol-position: right; }
+"""
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    # Estilo Fusion: apariencia uniforme en todas las versiones de Windows
+    app.setStyle("Fusion")
+    # Conservar el aspecto nativo solo en los scrollbars
+    app.setStyleSheet(_SCROLLBAR_QSS)
     # Ícono global
-    import sys as _sys2
+    import sys as _sys2, time as _time
     _base2 = getattr(_sys2, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     _ico2  = os.path.join(_base2, 'thermophase.ico')
     if os.path.exists(_ico2):
@@ -776,8 +813,13 @@ if __name__ == "__main__":
     splash = SplashScreen()
     splash.show()
     app.processEvents()
+    _t_ini = _time.time()
     # Cargar ventana principal
     win = MainWindow()
+    # Mantener el splash visible al menos 2 segundos en total
+    _espera = 2.0 - (_time.time() - _t_ini)
+    if _espera > 0:
+        _time.sleep(_espera)
     splash.close()
     win.show()
     sys.exit(app.exec())
