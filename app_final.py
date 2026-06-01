@@ -172,23 +172,7 @@ class TabEquilibrio(QWidget):
         self.sp_P.setFixedHeight(22); self.sp_P.setFixedWidth(110)
         self.sp_P.setStyleSheet(
             f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt; padding-right:16px; }}'
-            f'QDoubleSpinBox::up-button {{ subcontrol-origin:border;'
-            f'subcontrol-position:top right; width:15px; height:11px;'
-            f'border-left:1px solid {BORDER}; border-bottom:1px solid {BORDER};'
-            f'background:#E8E8E8; }}'
-            f'QDoubleSpinBox::up-button:hover {{ background:#D0D0D0; }}'
-            f'QDoubleSpinBox::up-arrow {{ width:0px; height:0px;'
-            f'border-left:3px solid transparent; border-right:3px solid transparent;'
-            f'border-bottom:5px solid #333333; }}'
-            f'QDoubleSpinBox::down-button {{ subcontrol-origin:border;'
-            f'subcontrol-position:bottom right; width:15px; height:11px;'
-            f'border-left:1px solid {BORDER}; border-top:1px solid {BORDER};'
-            f'background:#E8E8E8; }}'
-            f'QDoubleSpinBox::down-button:hover {{ background:#D0D0D0; }}'
-            f'QDoubleSpinBox::down-arrow {{ width:0px; height:0px;'
-            f'border-left:3px solid transparent; border-right:3px solid transparent;'
-            f'border-top:5px solid #333333; }}')
+            f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
         gl.addWidget(self.sp_P, 0, 1)
 
         gl.addWidget(inp_lbl("Temperatura (°R):"), 1, 0)
@@ -199,23 +183,7 @@ class TabEquilibrio(QWidget):
         self.sp_T.setFixedHeight(22); self.sp_T.setFixedWidth(110)
         self.sp_T.setStyleSheet(
             f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt; padding-right:16px; }}'
-            f'QDoubleSpinBox::up-button {{ subcontrol-origin:border;'
-            f'subcontrol-position:top right; width:15px; height:11px;'
-            f'border-left:1px solid {BORDER}; border-bottom:1px solid {BORDER};'
-            f'background:#E8E8E8; }}'
-            f'QDoubleSpinBox::up-button:hover {{ background:#D0D0D0; }}'
-            f'QDoubleSpinBox::up-arrow {{ width:0px; height:0px;'
-            f'border-left:3px solid transparent; border-right:3px solid transparent;'
-            f'border-bottom:5px solid #333333; }}'
-            f'QDoubleSpinBox::down-button {{ subcontrol-origin:border;'
-            f'subcontrol-position:bottom right; width:15px; height:11px;'
-            f'border-left:1px solid {BORDER}; border-top:1px solid {BORDER};'
-            f'background:#E8E8E8; }}'
-            f'QDoubleSpinBox::down-button:hover {{ background:#D0D0D0; }}'
-            f'QDoubleSpinBox::down-arrow {{ width:0px; height:0px;'
-            f'border-left:3px solid transparent; border-right:3px solid transparent;'
-            f'border-top:5px solid #333333; }}')
+            f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
         self.sp_T.valueChanged.connect(
             lambda v: self.lbl_F.setText(f"({v-459.67:.1f} °F)"))
         gl.addWidget(self.sp_T, 1, 1)
@@ -234,17 +202,10 @@ class TabEquilibrio(QWidget):
 
         rp = QHBoxLayout(); rp.setSpacing(8)
 
-        _CHK_B64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNCIgaGVpZ2h0PSIxNCIgdmlld0JveD0iMCAwIDE0IDE0Ij48cGF0aCBkPSJNMi41IDdMNS41IDEwTDExIDMuNSIgc3Ryb2tlPSIjMDAwMDAwIiBzdHJva2Utd2lkdGg9IjEuOCIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+"
         self.chk = QCheckBox("Fraccion masica")
         self.chk.setStyleSheet(
             f'QCheckBox {{ font-family:"{FONT_F}";font-size:{FS}pt;'
-            f'background:transparent; spacing:6px; }}'
-            f'QCheckBox::indicator {{ width:14px; height:14px;'
-            f'border:1px solid #555555; background:{WHITE}; }}'
-            f'QCheckBox::indicator:unchecked:hover {{ border:1px solid #333333; }}'
-            f'QCheckBox::indicator:checked {{ background:{WHITE};'
-            f'border:1px solid #555555;'
-            f'image:url("data:image/svg+xml;base64,{_CHK_B64}"); }}')
+            f'background:transparent; spacing:6px; }}')
         self.chk.stateChanged.connect(self._on_chk)
         rp.addWidget(self.chk, alignment=Qt.AlignmentFlag.AlignVCenter)
 
