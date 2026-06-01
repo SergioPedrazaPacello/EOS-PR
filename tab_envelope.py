@@ -99,12 +99,14 @@ class TabEnvolvente(QWidget):
 
         # Barra de progreso estándar
         self.prog=QProgressBar()
-        self.prog.setRange(0,0)
+        self.prog.setRange(0,0)            # modo indeterminado
         self.prog.setVisible(False)
-        self.prog.setTextVisible(True)
-        self.prog.setFormat("Cargando")
-        self.prog.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.prog.setStyleSheet(f'font-family:"{FONT_F}";font-size:9pt;')
+        self.prog.setTextVisible(False)    # sin texto
+        self.prog.setFixedHeight(18)
+        self.prog.setStyleSheet(
+            f'QProgressBar {{ border:1px solid #888888; background:#E8E8E8;'
+            f'border-radius:0px; }}'
+            f'QProgressBar::chunk {{ background:#2d7d2d; }}')
         vr.addWidget(self.prog)
 
         sep=QFrame(); sep.setFrameShape(QFrame.Shape.HLine)

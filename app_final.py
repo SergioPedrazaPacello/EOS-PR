@@ -234,15 +234,17 @@ class TabEquilibrio(QWidget):
 
         rp = QHBoxLayout(); rp.setSpacing(8)
 
+        _CHK_B64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNCIgaGVpZ2h0PSIxNCIgdmlld0JveD0iMCAwIDE0IDE0Ij48cGF0aCBkPSJNMi41IDdMNS41IDEwTDExIDMuNSIgc3Ryb2tlPSIjMDAwMDAwIiBzdHJva2Utd2lkdGg9IjEuOCIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+"
         self.chk = QCheckBox("Fraccion masica")
         self.chk.setStyleSheet(
             f'QCheckBox {{ font-family:"{FONT_F}";font-size:{FS}pt;'
             f'background:transparent; spacing:6px; }}'
-            f'QCheckBox::indicator {{ width:13px; height:13px;'
-            f'border:1px solid #555555; background:{WHITE}; border-radius:2px; }}'
-            f'QCheckBox::indicator:unchecked:hover {{ border:1px solid {TEXT_RES}; }}'
-            f'QCheckBox::indicator:checked {{ background:{TEXT_RES};'
-            f'border:1px solid {TEXT_RES}; }}')
+            f'QCheckBox::indicator {{ width:14px; height:14px;'
+            f'border:1px solid #555555; background:{WHITE}; }}'
+            f'QCheckBox::indicator:unchecked:hover {{ border:1px solid #333333; }}'
+            f'QCheckBox::indicator:checked {{ background:{WHITE};'
+            f'border:1px solid #555555;'
+            f'image:url("data:image/svg+xml;base64,{_CHK_B64}"); }}')
         self.chk.stateChanged.connect(self._on_chk)
         rp.addWidget(self.chk, alignment=Qt.AlignmentFlag.AlignVCenter)
 
@@ -804,8 +806,6 @@ class MainWindow(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    # Estilo Fusion: apariencia uniforme en todas las versiones de Windows
-    app.setStyle("Fusion")
     # Ícono global
     import sys as _sys2, time as _time
     _base2 = getattr(_sys2, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
