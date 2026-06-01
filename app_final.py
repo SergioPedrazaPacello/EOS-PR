@@ -171,8 +171,24 @@ class TabEquilibrio(QWidget):
         self.sp_P.setRange(1,15000); self.sp_P.setValue(200); self.sp_P.setDecimals(2)
         self.sp_P.setFixedHeight(22); self.sp_P.setFixedWidth(110)
         self.sp_P.setStyleSheet(
-            f'background:{WHITE};border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;')
+            f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt; padding-right:16px; }}'
+            f'QDoubleSpinBox::up-button {{ subcontrol-origin:border;'
+            f'subcontrol-position:top right; width:15px; height:11px;'
+            f'border-left:1px solid {BORDER}; border-bottom:1px solid {BORDER};'
+            f'background:#E8E8E8; }}'
+            f'QDoubleSpinBox::up-button:hover {{ background:#D0D0D0; }}'
+            f'QDoubleSpinBox::up-arrow {{ width:0px; height:0px;'
+            f'border-left:3px solid transparent; border-right:3px solid transparent;'
+            f'border-bottom:5px solid #333333; }}'
+            f'QDoubleSpinBox::down-button {{ subcontrol-origin:border;'
+            f'subcontrol-position:bottom right; width:15px; height:11px;'
+            f'border-left:1px solid {BORDER}; border-top:1px solid {BORDER};'
+            f'background:#E8E8E8; }}'
+            f'QDoubleSpinBox::down-button:hover {{ background:#D0D0D0; }}'
+            f'QDoubleSpinBox::down-arrow {{ width:0px; height:0px;'
+            f'border-left:3px solid transparent; border-right:3px solid transparent;'
+            f'border-top:5px solid #333333; }}')
         gl.addWidget(self.sp_P, 0, 1)
 
         gl.addWidget(inp_lbl("Temperatura (°R):"), 1, 0)
@@ -182,8 +198,24 @@ class TabEquilibrio(QWidget):
         self.sp_T.setDecimals(2)
         self.sp_T.setFixedHeight(22); self.sp_T.setFixedWidth(110)
         self.sp_T.setStyleSheet(
-            f'background:{WHITE};border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;')
+            f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt; padding-right:16px; }}'
+            f'QDoubleSpinBox::up-button {{ subcontrol-origin:border;'
+            f'subcontrol-position:top right; width:15px; height:11px;'
+            f'border-left:1px solid {BORDER}; border-bottom:1px solid {BORDER};'
+            f'background:#E8E8E8; }}'
+            f'QDoubleSpinBox::up-button:hover {{ background:#D0D0D0; }}'
+            f'QDoubleSpinBox::up-arrow {{ width:0px; height:0px;'
+            f'border-left:3px solid transparent; border-right:3px solid transparent;'
+            f'border-bottom:5px solid #333333; }}'
+            f'QDoubleSpinBox::down-button {{ subcontrol-origin:border;'
+            f'subcontrol-position:bottom right; width:15px; height:11px;'
+            f'border-left:1px solid {BORDER}; border-top:1px solid {BORDER};'
+            f'background:#E8E8E8; }}'
+            f'QDoubleSpinBox::down-button:hover {{ background:#D0D0D0; }}'
+            f'QDoubleSpinBox::down-arrow {{ width:0px; height:0px;'
+            f'border-left:3px solid transparent; border-right:3px solid transparent;'
+            f'border-top:5px solid #333333; }}')
         self.sp_T.valueChanged.connect(
             lambda v: self.lbl_F.setText(f"({v-459.67:.1f} °F)"))
         gl.addWidget(self.sp_T, 1, 1)
@@ -204,7 +236,13 @@ class TabEquilibrio(QWidget):
 
         self.chk = QCheckBox("Fraccion masica")
         self.chk.setStyleSheet(
-            f'font-family:"{FONT_F}";font-size:{FS}pt;background:transparent;')
+            f'QCheckBox {{ font-family:"{FONT_F}";font-size:{FS}pt;'
+            f'background:transparent; spacing:6px; }}'
+            f'QCheckBox::indicator {{ width:13px; height:13px;'
+            f'border:1px solid #555555; background:{WHITE}; border-radius:2px; }}'
+            f'QCheckBox::indicator:unchecked:hover {{ border:1px solid {TEXT_RES}; }}'
+            f'QCheckBox::indicator:checked {{ background:{TEXT_RES};'
+            f'border:1px solid {TEXT_RES}; }}')
         self.chk.stateChanged.connect(self._on_chk)
         rp.addWidget(self.chk, alignment=Qt.AlignmentFlag.AlignVCenter)
 
@@ -764,45 +802,10 @@ class MainWindow(QMainWindow):
             f"R = {R_GAS} psi·ft³/(lb-mol·°R)  |  13 componentes")
         self.setStatusBar(sb)
 
-# QSS para que los scrollbars conserven el aspecto nativo de Windows
-# (Fusion cambiaría los scrollbars; este estilo los devuelve al look clásico)
-_SCROLLBAR_QSS = """
-QScrollBar:vertical {
-    background: #F0F0F0; width: 17px; margin: 0px;
-    border-left: 1px solid #D0D0D0;
-}
-QScrollBar::handle:vertical {
-    background: #CDCDCD; min-height: 20px; border-radius: 0px;
-}
-QScrollBar::handle:vertical:hover { background: #A6A6A6; }
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-    background: #F0F0F0; height: 17px; border: 1px solid #D0D0D0;
-    subcontrol-origin: margin;
-}
-QScrollBar::sub-line:vertical { subcontrol-position: top; }
-QScrollBar::add-line:vertical { subcontrol-position: bottom; }
-QScrollBar:horizontal {
-    background: #F0F0F0; height: 17px; margin: 0px;
-    border-top: 1px solid #D0D0D0;
-}
-QScrollBar::handle:horizontal {
-    background: #CDCDCD; min-width: 20px; border-radius: 0px;
-}
-QScrollBar::handle:horizontal:hover { background: #A6A6A6; }
-QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
-    background: #F0F0F0; width: 17px; border: 1px solid #D0D0D0;
-    subcontrol-origin: margin;
-}
-QScrollBar::sub-line:horizontal { subcontrol-position: left; }
-QScrollBar::add-line:horizontal { subcontrol-position: right; }
-"""
-
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     # Estilo Fusion: apariencia uniforme en todas las versiones de Windows
     app.setStyle("Fusion")
-    # Conservar el aspecto nativo solo en los scrollbars
-    app.setStyleSheet(_SCROLLBAR_QSS)
     # Ícono global
     import sys as _sys2, time as _time
     _base2 = getattr(_sys2, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
