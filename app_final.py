@@ -202,12 +202,15 @@ class TabEquilibrio(QWidget):
 
         rp = QHBoxLayout(); rp.setSpacing(8)
 
-        self.chk = QCheckBox("Fraccion masica")
-        self.chk.setStyleSheet(
-            f'QCheckBox {{ font-family:"{FONT_F}";font-size:{FS}pt;'
-            f'background:transparent; spacing:6px; }}')
-        self.chk.stateChanged.connect(self._on_chk)
-        rp.addWidget(self.chk, alignment=Qt.AlignmentFlag.AlignVCenter)
+        # Botón toggle que alterna entre Fraccion molar / masica
+        self.btn_frac = QPushButton("Fraccion masica")
+        self.btn_frac.setCheckable(True)
+        self.btn_frac.setFixedWidth(120)
+        self.btn_frac.setStyleSheet(
+            f'background:{GRAY_LBL};border:2px outset {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;min-height:22px;')
+        self.btn_frac.clicked.connect(self._on_chk)
+        rp.addWidget(self.btn_frac, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         btn_n = QPushButton("Normalizar")
         btn_n.setFixedWidth(100)
@@ -373,7 +376,9 @@ class TabEquilibrio(QWidget):
 
     # ── Handlers ─────────────────────────────────────────────
     def _on_chk(self):
-        masa = self.chk.isChecked()
+        masa = self.btn_frac.isChecked()
+        # El botón muestra el modo OPUESTO (la acción que realizará al hacer clic)
+        self.btn_frac.setText("Fraccion molar" if masa else "Fraccion masica")
         # Col 1 (Composicion General) SIEMPRE "Fraccion Molar"
         self.hdr_comp_vap.setText(
             "Fraccion masica" if masa else "Fraccion molar")
@@ -431,7 +436,7 @@ class TabEquilibrio(QWidget):
         self._render(r)
 
     def _render(self, r):
-        masa = self.chk.isChecked()
+        masa = self.btn_frac.isChecked()
         V=r["V"]; L=r["L"]
         ZV=r.get("ZV"); ZL=r.get("ZL")
         x=r["x"]; y=r["y"]
