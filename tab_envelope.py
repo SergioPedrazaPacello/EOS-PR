@@ -85,6 +85,9 @@ class TabEnvolvente(QWidget):
                                   QSizePolicy.Policy.Expanding)
         self.canvas.setVisible(False)   # oculto hasta calcular
         left_lay.addWidget(self.canvas)
+        # Cursor interactivo: muestra P y T en la posición del mouse
+        self._hover_annot = None
+        self.canvas.mpl_connect('motion_notify_event', self._on_hover)
 
         content.addWidget(self.left_box, stretch=1)
 
@@ -178,6 +181,7 @@ class TabEnvolvente(QWidget):
 
     def _plot(self,res):
         ax=self.ax; ax.clear()
+        self._hover_annot = None   # se invalida al limpiar los ejes
         ax.set_facecolor('#FAFAFA')
         burb=res.get('burbuja',[]); rocio=res.get('rocio',[])
         Tb=[t-459.67 for _,t in burb]; Pb=[p for p,_ in burb]
@@ -202,6 +206,31 @@ class TabEnvolvente(QWidget):
             ax.legend(fontsize=8, framealpha=0.9)
         ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
         ax.set_position([0.14, 0.09, 0.83, 0.88])
+        self.canvas.draw_idle()
+
+    def _on_hover(self, event):
+        # Solo si hay datos y el cursor está dentro del área de trazado
+        if not self.canvas.isVisible() or event.inaxes != self.ax:
+            if self._hover_annot is not None:
+                self._hover_annot.set_visible(False)
+                self.canvas.draw_idle()
+            return
+        T = event.xdata   # °F (eje X)
+        P = event.ydata   # psia (eje Y)
+        if T is None or P is None:
+            return
+        # Crear o actualizar la anotación
+        if self._hover_annot is None:
+            self._hover_annot = self.ax.annotate(
+                "", xy=(0,0), xytext=(12,12),
+                textcoords="offset points",
+                fontsize=8, fontfamily='Arial Narrow',
+                bbox=dict(boxstyle="round,pad=0.4", fc="#FFFFE0",
+                          ec="#888888", lw=0.8),
+                zorder=10)
+        self._hover_annot.xy = (T, P)
+        self._hover_annot.set_text(f"T = {T:.1f} °F\nP = {P:.1f} psia")
+        self._hover_annot.set_visible(True)
         self.canvas.draw_idle()
 
     def _update_results(self,res):
