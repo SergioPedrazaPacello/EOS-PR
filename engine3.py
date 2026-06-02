@@ -65,10 +65,12 @@ def cm(comp):   return sum(comp[i]*ci(i) for i in range(NC))
 # ── COSTALD (Hankinson-Thomson 1979) para densidad de líquido ──
 # Volumen característico V* (ft3/lbmol) y factor acéntrico SRK por componente
 # Orden: N2, CO2, C1, C2, C3, iC4, nC4, iC5, nC5, C6, C7, C8, C9
-VSTAR_COSTALD = [1.4433, 1.5025, 1.5922, 2.3355, 3.2069, 4.2193, 4.0799,
-                 4.8985, 4.9866, 5.9749, 6.9040, 7.7984, 8.7141]
-OMEGA_SRK = [0.03726, 0.23894, 0.01150, 0.09246, 0.15238, 0.18479, 0.20100,
-             0.22224, 0.25143, 0.29007, 0.34960, 0.39552, 0.44346]
+# Valores exactos extraídos de HYSYS (Characteristic Volume y SRK Acentricity)
+VSTAR_COSTALD = [1.44406, 1.50301, 1.59207, 2.33469, 3.20497, 4.11402, 4.07494,
+                 4.95916, 4.98687, 5.89800, 6.89499, 7.85577, 8.85661]
+OMEGA_SRK = [0.0357998, 0.237250, 0.00740000, 0.0983000, 0.153200, 0.182500,
+             0.200800, 0.239950, 0.252200, 0.300700, 0.350690, 0.399800,
+             0.447800]
 
 def costald_Vs(comp, T):
     """Volumen molar de líquido saturado por COSTALD (ft3/lbmol)."""
