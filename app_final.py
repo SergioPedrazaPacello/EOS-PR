@@ -203,9 +203,11 @@ class TabEquilibrio(QWidget):
             alignment=Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
         top.addStretch()
 
-        # Panel derecho: botones arriba + selector densidad abajo alineado derecha
-        rp = QVBoxLayout(); rp.setSpacing(4)
-        rp.setAlignment(Qt.AlignmentFlag.AlignTop)
+        # Panel derecho: QVBoxLayout con stretch arriba/abajo para centrar botones,
+        # selector densidad al fondo alineado a la derecha
+        rp = QVBoxLayout(); rp.setSpacing(0); rp.setContentsMargins(0,0,0,0)
+
+        rp.addStretch(1)   # empuja botones hacia el centro
 
         # Fila de botones
         btn_row = QHBoxLayout(); btn_row.setSpacing(8)
@@ -237,14 +239,17 @@ class TabEquilibrio(QWidget):
         btn_row.addWidget(self.btn, alignment=Qt.AlignmentFlag.AlignVCenter)
         rp.addLayout(btn_row)
 
-        # Fila selector densidad — alineado a la derecha
-        dens_row = QHBoxLayout(); dens_row.setSpacing(6)
+        rp.addStretch(1)   # equilibra el espacio debajo de los botones
+
+        # Fila selector densidad — etiqueta igual a inp_lbl + combobox, alineados a derecha
+        dens_row = QHBoxLayout(); dens_row.setSpacing(4)
         dens_row.addStretch()
         lbl_dens = QLabel("Densidad:")
-        lbl_dens.setStyleSheet(
-            f'font-family:"{FONT_F}";font-size:{FS}pt;'
-            f'color:{TEXT};background:transparent;')
+        lbl_dens.setFixedHeight(22)
         lbl_dens.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+        lbl_dens.setStyleSheet(
+            f'background:{GRAY_LBL};border:1px solid {BORDER};'
+            f'padding:2px 6px;font-family:"{FONT_F}";font-size:{FS}pt;')
         dens_row.addWidget(lbl_dens, alignment=Qt.AlignmentFlag.AlignVCenter)
         self.cmb_dens = QComboBox()
         self.cmb_dens.addItems(["COSTALD", "EOS"])
