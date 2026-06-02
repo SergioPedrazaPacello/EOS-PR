@@ -55,6 +55,46 @@ NC = 13
 # ── Parámetros individuales PR ──────────────────────────────
 def ai(i):      return 0.45724*R_GAS**2*TC[i]**2/PC[i]
 def bi(i):      return 0.07780*R_GAS*TC[i]/PC[i]
+
+# ── Corrección de volumen de Peneloux (volume shift) ──
+# Mejora la densidad de líquido del PR. Z_RA = factor de Rackett.
+def Z_RA(i):    return 0.29056 - 0.08775*OMEGA[i]
+def ci(i):      return 0.40768*(R_GAS*TC[i]/PC[i])*(0.29441 - Z_RA(i))
+def cm(comp):   return sum(comp[i]*ci(i) for i in range(NC))
+
+# ── COSTALD (Hankinson-Thomson 1979) para densidad de líquido ──
+# Volumen característico V* (ft3/lbmol) y factor acéntrico SRK por componente
+# Orden: N2, CO2, C1, C2, C3, iC4, nC4, iC5, nC5, C6, C7, C8, C9
+VSTAR_COSTALD = [1.4433, 1.5025, 1.5922, 2.3355, 3.2069, 4.2193, 4.0799,
+                 4.8985, 4.9866, 5.9749, 6.9040, 7.7984, 8.7141]
+OMEGA_SRK = [0.03726, 0.23894, 0.01150, 0.09246, 0.15238, 0.18479, 0.20100,
+             0.22224, 0.25143, 0.29007, 0.34960, 0.39552, 0.44346]
+
+def costald_Vs(comp, T):
+    """Volumen molar de líquido saturado por COSTALD (ft3/lbmol)."""
+    s_xV   = sum(comp[i]*VSTAR_COSTALD[i]          for i in range(NC))
+    s_xV13 = sum(comp[i]*VSTAR_COSTALD[i]**(1/3.0) for i in range(NC))
+    s_xV23 = sum(comp[i]*VSTAR_COSTALD[i]**(2/3.0) for i in range(NC))
+    Vm_star = 0.25*(s_xV + 3.0*s_xV13*s_xV23)
+    if Vm_star <= 0: return None
+    num = 0.0
+    for i in range(NC):
+        if comp[i] == 0: continue
+        for j in range(NC):
+            if comp[j] == 0: continue
+            num += comp[i]*comp[j]*np.sqrt(
+                VSTAR_COSTALD[i]*TC[i]*VSTAR_COSTALD[j]*TC[j])
+    Tcm = num/Vm_star
+    omega_m = sum(comp[i]*OMEGA_SRK[i] for i in range(NC))
+    Tr = T/Tcm
+    if Tr >= 1.0: Tr = 0.99      # COSTALD válido sólo para Tr<1
+    tau = 1.0 - Tr
+    V0 = (1 - 1.52816*tau**(1/3.0) + 1.43907*tau**(2/3.0)
+            - 0.81446*tau + 0.190454*tau**(4/3.0))
+    Vd = ((-0.296123 + 0.386914*Tr - 0.0427258*Tr**2 - 0.0480645*Tr**3)
+          / (Tr - 1.00001))
+    Vs = Vm_star*V0*(1.0 - omega_m*Vd)
+    return Vs if Vs > 0 else None
 def mi(i):      w=OMEGA[i]; return 0.37464+1.54226*w-0.26992*w**2
 def alpha(i,T): return (1+mi(i)*(1-np.sqrt(T/TC[i])))**2
 def ai_alpha(i,T): return ai(i)*alpha(i,T)
@@ -198,7 +238,7 @@ def analisis_estabilidad(z,T,P,kij,tol=1e-12,triv_tol=1e-4,tol_S=1e-4,max_iter=1
             "Sv":Sv,"Sl":Sl,"Kv":Kv,"Kl":Kl,"iter":it+1}
 
 # ══ Flash Muskat-McDowell ════════════════════════════════════
-def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000):
+def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'):
     """
     Réplica EXACTA de la macro CalculoFlash:
     - Si ΣKi·zi ≤ 1 → fase única LÍQUIDA (x=z, y=0)
@@ -348,7 +388,16 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000):
     if L>0 and PM_l>0:
         am_l=am(x,T,kij); bm_l=bm(x)
         _,ZL_fin=solve_Z(*AB(am_l,bm_l,T,P))
-        rho_l=P*PM_l/(ZL_fin*R_GAS*T)
+        if metodo_densidad == 'COSTALD':
+            # Densidad de líquido por COSTALD; Z se deriva de esa densidad
+            Vs = costald_Vs(x, T)
+            if Vs and Vs > 0:
+                rho_l = PM_l/Vs
+                ZL_fin = P*Vs/(R_GAS*T)   # Z consistente con densidad COSTALD
+            else:
+                rho_l = P*PM_l/(ZL_fin*R_GAS*T)
+        else:
+            rho_l = P*PM_l/(ZL_fin*R_GAS*T)
         sg_l=rho_l/62.4  # SG líquido respecto al agua
 
     den_m = V*PM_v+L*PM_l if (V*PM_v+L*PM_l)>0 else 1
@@ -370,7 +419,7 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000):
     }
 
 # ══ Punto de entrada ═════════════════════════════════════════
-def calcular(z,T,P,kij=None):
+def calcular(z,T,P,kij=None,metodo_densidad='EOS'):
     """
     Réplica de Sub AnalisisYFlash():
     1. Análisis de estabilidad de Michelsen
@@ -379,7 +428,7 @@ def calcular(z,T,P,kij=None):
     """
     if kij is None: kij=copy.deepcopy(KIJ_DEFAULT)
     estab=analisis_estabilidad(z,T,P,kij)
-    flash=flash_muskat(z,T,P,estab["Ki_flash"],kij)
+    flash=flash_muskat(z,T,P,estab["Ki_flash"],kij,metodo_densidad=metodo_densidad)
     flash["estabilidad"]=estab["resultado"]
     flash["iter_estab"]=estab["iter"]
     flash["inestable"]=estab["inestable"]

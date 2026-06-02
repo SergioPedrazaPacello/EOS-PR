@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTabWidget, QTableWidget, QTableWidgetItem, QLabel, QPushButton,
     QDoubleSpinBox, QGridLayout, QFrame, QHeaderView,
-    QCheckBox, QMessageBox, QStatusBar, QAbstractItemView, QScrollArea
+    QCheckBox, QMessageBox, QStatusBar, QAbstractItemView, QScrollArea, QComboBox
 )
 import matplotlib
 matplotlib.use('QtAgg')
@@ -112,11 +112,13 @@ ROW_H  = 22
 class Worker(QThread):
     done  = pyqtSignal(dict)
     error = pyqtSignal(str)
-    def __init__(self, z, T, P, kij):
+    def __init__(self, z, T, P, kij, metodo_densidad='EOS'):
         super().__init__()
         self.z=z; self.T=T; self.P=P; self.kij=kij
+        self.metodo_densidad=metodo_densidad
     def run(self):
-        try:    self.done.emit(calcular(self.z, self.T, self.P, self.kij))
+        try:    self.done.emit(calcular(self.z, self.T, self.P, self.kij,
+                                        metodo_densidad=self.metodo_densidad))
         except Exception as e: self.error.emit(str(e))
 
 # ══════════════════════════════════════════════════════════════
@@ -195,6 +197,16 @@ class TabEquilibrio(QWidget):
         self.lbl_F.setAlignment(
             Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         gl.addWidget(self.lbl_F, 2, 1)
+
+        # Selector de método de densidad de líquido
+        gl.addWidget(inp_lbl("Densidad liq.:"), 3, 0)
+        self.cmb_dens = QComboBox()
+        self.cmb_dens.addItems(["COSTALD", "EOS"])
+        self.cmb_dens.setFixedHeight(22); self.cmb_dens.setFixedWidth(110)
+        self.cmb_dens.setStyleSheet(
+            f'QComboBox {{ background:{WHITE};border:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt; padding:1px 4px; }}')
+        gl.addWidget(self.cmb_dens, 3, 1)
 
         top.addWidget(pin,
             alignment=Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
@@ -421,7 +433,8 @@ class TabEquilibrio(QWidget):
                 "La suma de fracciones debe ser 1.0")
             return
         self.btn.setEnabled(False); self.btn.setText("Calculando...")
-        self.worker = Worker(z, self.get_T(), self.get_P(), kij_user)
+        self.worker = Worker(z, self.get_T(), self.get_P(), kij_user,
+                             metodo_densidad=self.cmb_dens.currentText())
         self.worker.done.connect(self._on_result)
         self.worker.error.connect(self._on_error)
         self.worker.start()
