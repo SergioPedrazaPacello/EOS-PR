@@ -198,21 +198,17 @@ class TabEquilibrio(QWidget):
             Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         gl.addWidget(self.lbl_F, 2, 1)
 
-        # Selector de método de densidad de líquido
-        gl.addWidget(inp_lbl("Densidad liq.:"), 3, 0)
-        self.cmb_dens = QComboBox()
-        self.cmb_dens.addItems(["COSTALD", "EOS"])
-        self.cmb_dens.setFixedHeight(22); self.cmb_dens.setFixedWidth(110)
-        self.cmb_dens.setStyleSheet(
-            f'QComboBox {{ background:{WHITE};border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt; padding:1px 4px; }}')
-        gl.addWidget(self.cmb_dens, 3, 1)
 
         top.addWidget(pin,
             alignment=Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
         top.addStretch()
 
-        rp = QHBoxLayout(); rp.setSpacing(8)
+        # Panel derecho: botones arriba + selector densidad abajo alineado derecha
+        rp = QVBoxLayout(); rp.setSpacing(4)
+        rp.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        # Fila de botones
+        btn_row = QHBoxLayout(); btn_row.setSpacing(8)
 
         # Botón toggle que alterna entre Fraccion molar / masica
         self.btn_frac = QPushButton("Fraccion masica")
@@ -222,7 +218,7 @@ class TabEquilibrio(QWidget):
             f'background:{GRAY_LBL};border:2px outset {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt;min-height:22px;')
         self.btn_frac.clicked.connect(self._on_chk)
-        rp.addWidget(self.btn_frac, alignment=Qt.AlignmentFlag.AlignVCenter)
+        btn_row.addWidget(self.btn_frac, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         btn_n = QPushButton("Normalizar")
         btn_n.setFixedWidth(100)
@@ -230,7 +226,7 @@ class TabEquilibrio(QWidget):
             f'background:{GRAY_LBL};border:2px outset {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt;min-height:22px;')
         btn_n.clicked.connect(self.normalizar)
-        rp.addWidget(btn_n, alignment=Qt.AlignmentFlag.AlignVCenter)
+        btn_row.addWidget(btn_n, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         self.btn = QPushButton("Realizar Calculo")
         self.btn.setFixedWidth(130)
@@ -238,7 +234,27 @@ class TabEquilibrio(QWidget):
             f'background:{GRAY_LBL};border:2px outset {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt;min-height:22px;')
         self.btn.clicked.connect(self.calcular)
-        rp.addWidget(self.btn, alignment=Qt.AlignmentFlag.AlignVCenter)
+        btn_row.addWidget(self.btn, alignment=Qt.AlignmentFlag.AlignVCenter)
+        rp.addLayout(btn_row)
+
+        # Fila selector densidad — alineado a la derecha
+        dens_row = QHBoxLayout(); dens_row.setSpacing(6)
+        dens_row.addStretch()
+        lbl_dens = QLabel("Densidad:")
+        lbl_dens.setStyleSheet(
+            f'font-family:"{FONT_F}";font-size:{FS}pt;'
+            f'color:{TEXT};background:transparent;')
+        lbl_dens.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+        dens_row.addWidget(lbl_dens, alignment=Qt.AlignmentFlag.AlignVCenter)
+        self.cmb_dens = QComboBox()
+        self.cmb_dens.addItems(["COSTALD", "EOS"])
+        self.cmb_dens.setFixedHeight(22); self.cmb_dens.setFixedWidth(110)
+        self.cmb_dens.setStyleSheet(
+            f'QComboBox {{ background:{WHITE};border:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt; padding:1px 4px; }}')
+        dens_row.addWidget(self.cmb_dens, alignment=Qt.AlignmentFlag.AlignVCenter)
+        rp.addLayout(dens_row)
+
         top.addLayout(rp)
         root.addLayout(top)
 
