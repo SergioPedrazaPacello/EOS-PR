@@ -6,7 +6,7 @@ Mismo estilo (Arial Narrow) que el resto del programa.
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
     QDoubleSpinBox, QGridLayout, QFrame, QTableWidget, QTableWidgetItem,
-    QHeaderView, QAbstractItemView, QSizePolicy
+    QHeaderView, QAbstractItemView, QSizePolicy, QAbstractSpinBox
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QBrush
@@ -23,7 +23,7 @@ LBL_TIT=(f'background:{GRAY_TIT};color:{TEXT};border:1px solid {BORDER};'
          f'font-family:"{FONT_F}";font-size:{FS}pt;padding:0px 6px;')
 LBL_SEC=(f'background:{GRAY_LBL};color:{TEXT};border:1px solid {BORDER};'
          f'font-family:"{FONT_F}";font-size:{FS}pt;padding:0px 6px;')
-LBL_RES=(f'background:{GRAY_RES};border:1px solid {BORDER};color:{TEXT_RES};'
+LBL_RES=(f'background:{GRAY_LBL};border:1px solid {BORDER};color:{TEXT_RES};'
          f'font-family:"{FONT_F}";font-size:{FS}pt;padding:2px 6px;')
 
 
@@ -87,7 +87,7 @@ class TabSaturacion(QWidget):
         gl.addWidget(lbl("Calcular:"), 0, 0)
         self.cmb_tipo=QComboBox()
         self.cmb_tipo.addItems(list(self.TIPOS.keys()))
-        self.cmb_tipo.setFixedHeight(24)
+        self.cmb_tipo.setFixedHeight(24); self.cmb_tipo.setFixedWidth(160)
         self.cmb_tipo.setStyleSheet(
             f'QComboBox {{ background:{WHITE};border:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt; padding:1px 4px; }}')
@@ -96,10 +96,14 @@ class TabSaturacion(QWidget):
 
         # Etiqueta + campo de condición (P o T)
         self.lbl_cond=lbl("Presion (psi):")
+        self.lbl_cond.setFixedWidth(130)
         gl.addWidget(self.lbl_cond, 1, 0)
         self.sp_cond=QDoubleSpinBox()
         self.sp_cond.setRange(0.01, 15000.0); self.sp_cond.setDecimals(2)
         self.sp_cond.setValue(300.0); self.sp_cond.setFixedHeight(24)
+        self.sp_cond.setFixedWidth(160)
+        # Sin flechas de incremento/decremento
+        self.sp_cond.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.sp_cond.setStyleSheet(
             f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
@@ -151,7 +155,7 @@ class TabSaturacion(QWidget):
         root.addWidget(comp_title)
 
         self.tbl=QTableWidget(NC+1, 3)
-        self.tbl.setHorizontalHeaderLabels(["Componente","Fase Vapor (yi)","Fase Liquida (xi)"])
+        self.tbl.setHorizontalHeaderLabels(["Componente","Fase Vapor","Fase Liquida"])
         self.tbl.verticalHeader().setVisible(False)
         self.tbl.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tbl.setStyleSheet(
