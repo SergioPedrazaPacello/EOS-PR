@@ -382,6 +382,61 @@ def _cerrar_envolvente(burb, rocio, n_interp=20):
     rocio_cerrada = list(rocio) + rocio_extra
     return burb_cerrada, rocio_cerrada
 
+
+def punto_saturacion(tipo_calc, valor, z, kij=None):
+    """
+    Calcula un punto de saturación individual.
+    tipo_calc: 'T_rocio', 'T_burbuja', 'P_rocio', 'P_burbuja'
+    valor: la condición fija (P en psi para T_*, T en °R para P_*)
+    Retorna dict con: T (°R), P (psi), x (líquido), y (vapor), Ki, exito
+    """
+    if kij is None: kij = copy.deepcopy(KIJ_DEFAULT)
+
+    if tipo_calc == 'T_rocio':
+        P = valor
+        T0 = T_inicial_wilson(z, P)
+        Kw = [Ki_wilson(i, max(T0,50), P) for i in range(NC)]
+        s = sum(z[i]/Kw[i] if Kw[i]>1e-30 else 1e30 for i in range(NC))
+        comp0 = [z[i]/Kw[i]/s if Kw[i]>1e-30 else 0 for i in range(NC)]
+        T,Pf,Ki,comp,ok = encontrar_punto('D','T',T0,P,comp0,z,kij,
+                                          tol_comp=1e-11, max_ext=2000)
+        # Rocío: vapor=z, líquido=comp
+        return {'T':T,'P':P,'y':list(z),'x':comp,'Ki':Ki,'exito':ok}
+
+    elif tipo_calc == 'T_burbuja':
+        P = valor
+        T0 = T_inicial_wilson(z, P)
+        Kw = [Ki_wilson(i, max(T0,50), P) for i in range(NC)]
+        s = sum(z[i]*Kw[i] for i in range(NC))
+        comp0 = [z[i]*Kw[i]/s for i in range(NC)]
+        T,Pf,Ki,comp,ok = encontrar_punto('B','T',T0,P,comp0,z,kij,
+                                          tol_comp=1e-11, max_ext=2000)
+        # Burbuja: líquido=z, vapor=comp
+        return {'T':T,'P':P,'x':list(z),'y':comp,'Ki':Ki,'exito':ok}
+
+    elif tipo_calc == 'P_rocio':
+        T = valor
+        # Estimar P inicial por Wilson (buscar P donde SUM(z/K)=1)
+        P0 = 100.0
+        Kw = [Ki_wilson(i, max(T,50), P0) for i in range(NC)]
+        s = sum(z[i]/Kw[i] if Kw[i]>1e-30 else 1e30 for i in range(NC))
+        comp0 = [z[i]/Kw[i]/s if Kw[i]>1e-30 else 0 for i in range(NC)]
+        T2,P,Ki,comp,ok = encontrar_punto('D','P',T,P0,comp0,z,kij,
+                                          tol_comp=1e-11, max_ext=2000)
+        return {'T':T,'P':P,'y':list(z),'x':comp,'Ki':Ki,'exito':ok}
+
+    elif tipo_calc == 'P_burbuja':
+        T = valor
+        P0 = 100.0
+        Kw = [Ki_wilson(i, max(T,50), P0) for i in range(NC)]
+        s = sum(z[i]*Kw[i] for i in range(NC))
+        comp0 = [z[i]*Kw[i]/s for i in range(NC)]
+        T2,P,Ki,comp,ok = encontrar_punto('B','P',T,P0,comp0,z,kij,
+                                          tol_comp=1e-11, max_ext=2000)
+        return {'T':T,'P':P,'x':list(z),'y':comp,'Ki':Ki,'exito':ok}
+
+    return None
+
 def curva_envolvente(z,kij=None,progress_cb=None):
     if kij is None: kij=copy.deepcopy(KIJ_DEFAULT)
     def cb_b(n):

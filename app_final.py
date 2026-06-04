@@ -21,6 +21,7 @@ from engine3 import (
     calcular, R_GAS
 )
 from tab_envelope import TabEnvolvente
+from tab_saturacion import TabSaturacion
 
 kij_user = copy.deepcopy(KIJ_DEFAULT)
 
@@ -790,9 +791,14 @@ class MainWindow(QMainWindow):
             get_z=self.tab_eq.get_z,
             get_kij=lambda: kij_user
         )
+        self.tab_sat = TabSaturacion(
+            get_z=self.tab_eq.get_z,
+            get_kij=lambda: kij_user
+        )
         self.tab_par = TabParametros()
         tabs.addTab(self.tab_eq,  "Equilibrio de fases")
         tabs.addTab(self.tab_env, "Envolvente de fases")
+        tabs.addTab(self.tab_sat, "Puntos de saturacion")
         tabs.addTab(self.tab_par, "Parametros de la ecuacion de estado")
         lay.addWidget(tabs)
 
