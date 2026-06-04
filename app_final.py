@@ -171,7 +171,8 @@ class TabEquilibrio(QWidget):
 
         gl.addWidget(inp_lbl("Presion (psi):"), 0, 0)
         self.sp_P = QDoubleSpinBox()
-        self.sp_P.setRange(1,15000); self.sp_P.setValue(200); self.sp_P.setDecimals(2)
+        self.sp_P.setRange(0,15000); self.sp_P.setDecimals(2)
+        self.sp_P.setSpecialValueText(" "); self.sp_P.setValue(0)
         self.sp_P.setFixedHeight(22); self.sp_P.setFixedWidth(110)
         self.sp_P.setStyleSheet(
             f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
@@ -180,18 +181,18 @@ class TabEquilibrio(QWidget):
 
         gl.addWidget(inp_lbl("Temperatura (°R):"), 1, 0)
         self.sp_T = QDoubleSpinBox()
-        self.sp_T.setRange(1.0, 9999.99)
-        self.sp_T.setValue(350.0)
+        self.sp_T.setRange(0.0, 9999.99)
         self.sp_T.setDecimals(2)
+        self.sp_T.setSpecialValueText(" "); self.sp_T.setValue(0)
         self.sp_T.setFixedHeight(22); self.sp_T.setFixedWidth(110)
         self.sp_T.setStyleSheet(
             f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
         self.sp_T.valueChanged.connect(
-            lambda v: self.lbl_F.setText(f"({v-459.67:.1f} °F)"))
+            lambda v: self.lbl_F.setText("" if v<=0 else f"({v-459.67:.1f} °F)"))
         gl.addWidget(self.sp_T, 1, 1)
 
-        self.lbl_F = QLabel("(-109.7 °F)")
+        self.lbl_F = QLabel("")
         self.lbl_F.setStyleSheet(
             f'color:{TEXT_DIM};font-size:9pt;background:transparent;'
             f'font-family:"{FONT_F}";')
@@ -369,20 +370,18 @@ class TabEquilibrio(QWidget):
         self.tbl_comp.setColumnWidth(0, W_COMP)
         for c in [1,2,3]: self.tbl_comp.setColumnWidth(c, W_VAL)
 
-        z_def = [0,0,0.9,0.05,0.05,0,0,0,0,0,0,0,0]
         for i in range(NC):
             self.tbl_comp.setItem(i, 0, cell(
                 NOMBRES[i], bg=GRAY_LBL,
                 align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
-            self.tbl_comp.setItem(i, 1, cell(
-                f"{z_def[i]:.4f}", bg=WHITE, editable=True))
+            self.tbl_comp.setItem(i, 1, cell("", bg=WHITE, editable=True))
             self.tbl_comp.setItem(i, 2, cell("", bg=GRAY_RES, color=TEXT_RES))
             self.tbl_comp.setItem(i, 3, cell("", bg=GRAY_RES, color=TEXT_RES))
 
         # Fila de sumatorias dentro de tbl_comp (fila NC)
         self.tbl_comp.setItem(NC, 0, cell("Sumatorias:", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
-        self.tbl_comp.setItem(NC, 1, cell("1.0000", bg=WHITE))
+        self.tbl_comp.setItem(NC, 1, cell("", bg=WHITE))
         self.tbl_comp.setItem(NC, 2, cell("", bg=GRAY_RES))
         self.tbl_comp.setItem(NC, 3, cell("", bg=GRAY_RES))
         self.sum_row = NC  # índice de la fila sumatoria dentro de tbl_comp
@@ -451,6 +450,10 @@ class TabEquilibrio(QWidget):
 
     def calcular(self):
         z = self.get_z()
+        if self.get_P() <= 0 or self.get_T() <= 0:
+            QMessageBox.warning(self, "Datos faltantes",
+                "Ingrese la presion y la temperatura.")
+            return
         if abs(sum(z)-1.0) > 1e-3:
             QMessageBox.warning(self, "Composicion",
                 "La suma de fracciones debe ser 1.0")
