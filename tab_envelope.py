@@ -224,8 +224,8 @@ class TabEnvolvente(QWidget):
             self._hover_annot = self.ax.annotate(
                 "", xy=(0,0), xytext=(12,12),
                 textcoords="offset points",
-                fontsize=8, fontfamily='Arial Narrow',
-                bbox=dict(boxstyle="round,pad=0.4", fc="#FFFFE0",
+                fontsize=8, fontfamily='Arial Narrow', color="#000000",
+                bbox=dict(boxstyle="round,pad=0.4", fc="#D8D8D8",
                           ec="#888888", lw=0.8),
                 zorder=10)
         self._hover_annot.xy = (T, P)

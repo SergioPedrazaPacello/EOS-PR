@@ -96,7 +96,17 @@ class TabSaturacion(QWidget):
         self.cmb_tipo.setFixedHeight(24); self.cmb_tipo.setFixedWidth(160)
         self.cmb_tipo.setStyleSheet(
             f'QComboBox {{ background:{WHITE};border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt; padding:1px 4px; }}')
+            f'font-family:"{FONT_F}";font-size:{FS}pt; padding:1px 4px; }}'
+            f'QComboBox::drop-down {{ subcontrol-origin:padding;'
+            f'subcontrol-position:top right; width:16px;'
+            f'border-left:1px solid {BORDER}; background:#E8E8E8; }}'
+            f'QComboBox::down-arrow {{ width:0px; height:0px;'
+            f'border-left:4px solid transparent; border-right:4px solid transparent;'
+            f'border-top:5px solid #333333; }}'
+            f'QComboBox QAbstractItemView {{ background:{WHITE};'
+            f'border:1px solid {BORDER}; selection-background-color:{TEXT_RES};'
+            f'selection-color:{WHITE};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt; outline:none; }}')
         self.cmb_tipo.currentTextChanged.connect(self._on_tipo_change)
         gl.addWidget(self.cmb_tipo, 0, 1)
 
@@ -139,7 +149,7 @@ class TabSaturacion(QWidget):
         self.lbl_res_label=lbl("Temperatura de rocio (°F):")
         self.lbl_res_label.setFixedWidth(200)
         rl.addWidget(self.lbl_res_label, 0, 0)
-        self.lbl_res_val=lbl("—", res=True)
+        self.lbl_res_val=lbl("", res=True)
         self.lbl_res_val.setFixedWidth(120)
         self.lbl_res_val.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         rl.addWidget(self.lbl_res_val, 0, 1)
@@ -147,7 +157,7 @@ class TabSaturacion(QWidget):
         self.lbl_res2_label=lbl("Equivalente (°R / psi):")
         self.lbl_res2_label.setFixedWidth(200)
         rl.addWidget(self.lbl_res2_label, 1, 0)
-        self.lbl_res2_val=lbl("—", res=True)
+        self.lbl_res2_val=lbl("", res=True)
         self.lbl_res2_val.setFixedWidth(120)
         self.lbl_res2_val.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         rl.addWidget(self.lbl_res2_val, 1, 1)
@@ -187,7 +197,7 @@ class TabSaturacion(QWidget):
             it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
             self.tbl.setItem(i,0,it)
             for c in (1,2):
-                cell=QTableWidgetItem("—")
+                cell=QTableWidgetItem("")
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
                 self.tbl.setItem(i,c,cell)
         # Fila sumatorias
@@ -195,7 +205,7 @@ class TabSaturacion(QWidget):
         sit.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         self.tbl.setItem(NC,0,sit)
         for c in (1,2):
-            cell=QTableWidgetItem("—")
+            cell=QTableWidgetItem("")
             cell.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
             self.tbl.setItem(NC,c,cell)
 
@@ -244,7 +254,7 @@ class TabSaturacion(QWidget):
         self.btn.setEnabled(True); self.btn.setText("Calcular punto de saturacion")
         if not res or not res.get('exito'):
             self.lbl_estado.setText("No se encontro punto de saturacion")
-            self.lbl_res_val.setText("—"); self.lbl_res2_val.setText("—")
+            self.lbl_res_val.setText(""); self.lbl_res2_val.setText("")
             return
 
         T=res['T']; P=res['P']
