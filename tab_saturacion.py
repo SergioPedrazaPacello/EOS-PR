@@ -126,9 +126,11 @@ class TabSaturacion(QWidget):
         in_box.setFixedWidth(360)
 
         # ── Panel de resultados (a la derecha de la entrada) ──
+        RES_W = 320   # ancho del panel de resultados
         res_outer=QVBoxLayout(); res_outer.setSpacing(3)
         res_title=QLabel("Resultado:")
         res_title.setStyleSheet(LBL_SEC); res_title.setFixedHeight(22)
+        res_title.setFixedWidth(RES_W)
         res_outer.addWidget(res_title)
 
         res_box=QFrame()
@@ -136,18 +138,16 @@ class TabSaturacion(QWidget):
         rl=QGridLayout(res_box); rl.setContentsMargins(6,4,6,4); rl.setSpacing(4)
 
         self.lbl_res_label=lbl("Temperatura de rocio (°F):")
-        self.lbl_res_label.setFixedWidth(180)
         rl.addWidget(self.lbl_res_label, 0, 0)
         self.lbl_res_val=lbl("", res=True)
-        self.lbl_res_val.setFixedWidth(110)
+        self.lbl_res_val.setFixedWidth(120)
         self.lbl_res_val.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         rl.addWidget(self.lbl_res_val, 0, 1)
 
         self.lbl_res2_label=lbl("Equivalente (°R / psi):")
-        self.lbl_res2_label.setFixedWidth(180)
         rl.addWidget(self.lbl_res2_label, 1, 0)
         self.lbl_res2_val=lbl("", res=True)
-        self.lbl_res2_val.setFixedWidth(110)
+        self.lbl_res2_val.setFixedWidth(120)
         self.lbl_res2_val.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         rl.addWidget(self.lbl_res2_val, 1, 1)
 
@@ -156,16 +156,18 @@ class TabSaturacion(QWidget):
             f'color:{TEXT_DIM};font-family:"{FONT_F}";font-size:9pt;background:transparent;')
         rl.addWidget(self.lbl_estado, 2, 0, 1, 2)
 
-        rl.setColumnStretch(0,0); rl.setColumnStretch(1,1)
+        # Etiqueta estira para llenar, valor fijo a la derecha → sin huecos
+        rl.setColumnStretch(0,1); rl.setColumnStretch(1,0)
+        res_box.setFixedWidth(RES_W)
         res_outer.addWidget(res_box)
 
         # Layout horizontal: entrada (izq) + resultado (der)
         top_row=QHBoxLayout(); top_row.setSpacing(10)
         # La entrada va en su propio contenedor con el título de entrada vacío arriba
         in_wrap=QVBoxLayout(); in_wrap.setSpacing(3)
-        in_spacer=QLabel(""); in_spacer.setFixedHeight(22)
-        in_spacer.setStyleSheet('background:transparent;border:none;')
-        in_wrap.addWidget(in_spacer)
+        in_title=QLabel("Datos de entrada:")
+        in_title.setStyleSheet(LBL_SEC); in_title.setFixedHeight(22)
+        in_wrap.addWidget(in_title)
         in_wrap.addWidget(in_box)
         top_row.addLayout(in_wrap)
         top_row.addLayout(res_outer)
@@ -195,9 +197,6 @@ class TabSaturacion(QWidget):
         hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         self.tbl.setColumnWidth(1,130); self.tbl.setColumnWidth(2,130)
         self.tbl.verticalHeader().setDefaultSectionSize(22)
-        self.tbl.horizontalHeader().setFixedHeight(26)
-        # Altura fija para mostrar TODAS las filas sin scrollbar vertical
-        self.tbl.setFixedHeight((NC+1)*22 + 26 + 4)
         self.tbl.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tbl.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
@@ -249,7 +248,6 @@ class TabSaturacion(QWidget):
         hp.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         self.tbl_prop.setColumnWidth(1,130); self.tbl_prop.setColumnWidth(2,130)
         self.tbl_prop.verticalHeader().setDefaultSectionSize(22)
-        self.tbl_prop.horizontalHeader().setFixedHeight(26)
         self.tbl_prop.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tbl_prop.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
@@ -267,9 +265,22 @@ class TabSaturacion(QWidget):
                 cc.setBackground(QBrush(BLANCO_P))
                 self.tbl_prop.setItem(r,c,cc)
         self.tbl_prop.setRowCount(4)
-        self.tbl_prop.setFixedHeight(4*22 + 26 + 4)
         root.addWidget(self.tbl_prop)
         root.addStretch()   # el espacio sobrante va al fondo, no entre tablas
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._fit_table_heights()
+
+    def _fit_table_heights(self):
+        """Ajusta la altura de cada tabla a la suma real de sus filas,
+        para mostrar todas sin scrollbar (robusto ante DPI/versión Windows)."""
+        for tbl, nrows in [(self.tbl, NC+1), (self.tbl_prop, 4)]:
+            h = tbl.horizontalHeader().height()
+            for r in range(nrows):
+                h += tbl.rowHeight(r)
+            h += 2*tbl.frameWidth() + 2
+            tbl.setFixedHeight(h)
 
     def _on_tipo_change(self, txt):
         tipo, unidad, etiqueta, _ = self.TIPOS[txt]
