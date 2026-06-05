@@ -383,6 +383,47 @@ def _cerrar_envolvente(burb, rocio, n_interp=20):
     return burb_cerrada, rocio_cerrada
 
 
+
+def propiedades_punto(T, P, x, y, kij=None, metodo_densidad='COSTALD'):
+    """
+    Calcula propiedades de las fases vapor y líquido en un punto (T,P) dado.
+    Retorna dict con densidades, Z, PM y SG de cada fase.
+    """
+    from engine3 import (am as _am, bm as _bm, AB as _AB, solve_Z as _solveZ,
+                          PM as _PM, costald_Vs, R_GAS as _R)
+    if kij is None: kij = copy.deepcopy(KIJ_DEFAULT)
+    out = {}
+
+    # Peso molecular de cada fase
+    PM_v = sum(y[i]*_PM[i] for i in range(NC))
+    PM_l = sum(x[i]*_PM[i] for i in range(NC))
+    out['PM_v'] = PM_v; out['PM_l'] = PM_l
+
+    # Vapor — siempre por EOS
+    am_v = _am(y,T,kij); bm_v = _bm(y)
+    ZV,_ = _solveZ(*_AB(am_v,bm_v,T,P))
+    out['ZV'] = ZV
+    out['rho_v'] = P*PM_v/(ZV*_R*T) if ZV>0 else None
+    out['sg_v']  = PM_v/28.9625
+
+    # Líquido — por COSTALD o EOS según método
+    am_l = _am(x,T,kij); bm_l = _bm(x)
+    _,ZL = _solveZ(*_AB(am_l,bm_l,T,P))
+    if metodo_densidad == 'COSTALD':
+        Vs = costald_Vs(x, T)
+        if Vs and Vs > 0:
+            out['rho_l'] = PM_l/Vs
+            out['ZL'] = P*Vs/(_R*T)
+        else:
+            out['rho_l'] = P*PM_l/(ZL*_R*T) if ZL>0 else None
+            out['ZL'] = ZL
+    else:
+        out['rho_l'] = P*PM_l/(ZL*_R*T) if ZL>0 else None
+        out['ZL'] = ZL
+    out['sg_l'] = (out['rho_l']/62.4) if out.get('rho_l') else None
+
+    return out
+
 def punto_saturacion(tipo_calc, valor, z, kij=None):
     """
     Calcula un punto de saturación individual.
@@ -400,8 +441,8 @@ def punto_saturacion(tipo_calc, valor, z, kij=None):
         comp0 = [z[i]/Kw[i]/s if Kw[i]>1e-30 else 0 for i in range(NC)]
         T,Pf,Ki,comp,ok = encontrar_punto('D','T',T0,P,comp0,z,kij,
                                           tol_comp=1e-11, max_ext=2000)
-        # Rocío: vapor=z, líquido=comp
-        return {'T':T,'P':P,'y':list(z),'x':comp,'Ki':Ki,'exito':ok}
+        props = propiedades_punto(T,P,comp,list(z),kij) if ok else {}
+        return {'T':T,'P':P,'y':list(z),'x':comp,'Ki':Ki,'exito':ok,'props':props}
 
     elif tipo_calc == 'T_burbuja':
         P = valor
@@ -411,8 +452,8 @@ def punto_saturacion(tipo_calc, valor, z, kij=None):
         comp0 = [z[i]*Kw[i]/s for i in range(NC)]
         T,Pf,Ki,comp,ok = encontrar_punto('B','T',T0,P,comp0,z,kij,
                                           tol_comp=1e-11, max_ext=2000)
-        # Burbuja: líquido=z, vapor=comp
-        return {'T':T,'P':P,'x':list(z),'y':comp,'Ki':Ki,'exito':ok}
+        props = propiedades_punto(T,P,list(z),comp,kij) if ok else {}
+        return {'T':T,'P':P,'x':list(z),'y':comp,'Ki':Ki,'exito':ok,'props':props}
 
     elif tipo_calc == 'P_rocio':
         T = valor
@@ -423,7 +464,8 @@ def punto_saturacion(tipo_calc, valor, z, kij=None):
         comp0 = [z[i]/Kw[i]/s if Kw[i]>1e-30 else 0 for i in range(NC)]
         T2,P,Ki,comp,ok = encontrar_punto('D','P',T,P0,comp0,z,kij,
                                           tol_comp=1e-11, max_ext=2000)
-        return {'T':T,'P':P,'y':list(z),'x':comp,'Ki':Ki,'exito':ok}
+        props = propiedades_punto(T,P,comp,list(z),kij) if ok else {}
+        return {'T':T,'P':P,'y':list(z),'x':comp,'Ki':Ki,'exito':ok,'props':props}
 
     elif tipo_calc == 'P_burbuja':
         T = valor
@@ -433,7 +475,8 @@ def punto_saturacion(tipo_calc, valor, z, kij=None):
         comp0 = [z[i]*Kw[i]/s for i in range(NC)]
         T2,P,Ki,comp,ok = encontrar_punto('B','P',T,P0,comp0,z,kij,
                                           tol_comp=1e-11, max_ext=2000)
-        return {'T':T,'P':P,'x':list(z),'y':comp,'Ki':Ki,'exito':ok}
+        props = propiedades_punto(T,P,list(z),comp,kij) if ok else {}
+        return {'T':T,'P':P,'x':list(z),'y':comp,'Ki':Ki,'exito':ok,'props':props}
 
     return None
 

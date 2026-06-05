@@ -95,18 +95,7 @@ class TabSaturacion(QWidget):
         self.cmb_tipo.addItems(list(self.TIPOS.keys()))
         self.cmb_tipo.setFixedHeight(24); self.cmb_tipo.setFixedWidth(160)
         self.cmb_tipo.setStyleSheet(
-            f'QComboBox {{ background:{WHITE};border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt; padding:1px 4px; }}'
-            f'QComboBox::drop-down {{ subcontrol-origin:padding;'
-            f'subcontrol-position:top right; width:16px;'
-            f'border-left:1px solid {BORDER}; background:#E8E8E8; }}'
-            f'QComboBox::down-arrow {{ width:0px; height:0px;'
-            f'border-left:4px solid transparent; border-right:4px solid transparent;'
-            f'border-top:5px solid #333333; }}'
-            f'QComboBox QAbstractItemView {{ background:{WHITE};'
-            f'border:1px solid {BORDER}; selection-background-color:{TEXT_RES};'
-            f'selection-color:{WHITE};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt; outline:none; }}')
+            f'QComboBox {{ font-family:"{FONT_F}";font-size:{FS}pt; }}')
         self.cmb_tipo.currentTextChanged.connect(self._on_tipo_change)
         gl.addWidget(self.cmb_tipo, 0, 1)
 
@@ -192,9 +181,11 @@ class TabSaturacion(QWidget):
         self.tbl.setColumnWidth(1,130); self.tbl.setColumnWidth(2,130)
         self.tbl.verticalHeader().setDefaultSectionSize(20)
 
+        GRIS_NOMBRE = QColor("#E8E8E8")   # gris claro para nombres
         for i in range(NC):
             it=QTableWidgetItem(NOMBRES[i].rstrip(':'))
             it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+            it.setBackground(QBrush(GRIS_NOMBRE))
             self.tbl.setItem(i,0,it)
             for c in (1,2):
                 cell=QTableWidgetItem("")
@@ -203,6 +194,7 @@ class TabSaturacion(QWidget):
         # Fila sumatorias
         sit=QTableWidgetItem("Sumatorias:")
         sit.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+        sit.setBackground(QBrush(GRIS_NOMBRE))
         self.tbl.setItem(NC,0,sit)
         for c in (1,2):
             cell=QTableWidgetItem("")
@@ -210,6 +202,44 @@ class TabSaturacion(QWidget):
             self.tbl.setItem(NC,c,cell)
 
         root.addWidget(self.tbl, stretch=1)
+
+        # ── Panel de propiedades del punto de saturación ──────
+        prop_title=QLabel("Propiedades del punto de saturacion:")
+        prop_title.setStyleSheet(LBL_SEC); prop_title.setFixedHeight(22)
+        root.addWidget(prop_title)
+
+        self.tbl_prop=QTableWidget(6, 3)
+        self.tbl_prop.setHorizontalHeaderLabels(
+            ["Propiedad","Fase Vapor","Fase Liquida"])
+        self.tbl_prop.verticalHeader().setVisible(False)
+        self.tbl_prop.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.tbl_prop.setStyleSheet(
+            f'QTableWidget {{ background:{WHITE};gridline-color:{BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt; }}'
+            f'QHeaderView::section {{ background:{GRAY_HDR};border:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;padding:2px; }}')
+        hp=self.tbl_prop.horizontalHeader()
+        hp.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        hp.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        hp.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        self.tbl_prop.setColumnWidth(1,130); self.tbl_prop.setColumnWidth(2,130)
+        self.tbl_prop.verticalHeader().setDefaultSectionSize(20)
+
+        _props=["Peso molecular","Factor de compresibilidad",
+                "Densidad masica [lb/ft3]","Gravedad especifica"]
+        GRIS=QColor("#E8E8E8")
+        for r,lbl_p in enumerate(_props):
+            it=QTableWidgetItem(lbl_p)
+            it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+            it.setBackground(QBrush(GRIS))
+            self.tbl_prop.setItem(r,0,it)
+            for c in (1,2):
+                cc=QTableWidgetItem("")
+                cc.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+                self.tbl_prop.setItem(r,c,cc)
+        self.tbl_prop.setRowCount(4)
+        self.tbl_prop.setMaximumHeight(4*20 + 26)
+        root.addWidget(self.tbl_prop)
 
     def _on_tipo_change(self, txt):
         tipo, unidad, etiqueta, _ = self.TIPOS[txt]
@@ -283,3 +313,16 @@ class TabSaturacion(QWidget):
             self.tbl.item(i,2).setForeground(QBrush(QColor(TEXT_RES)))
         self.tbl.item(NC,1).setText(f"{sy:.4f}")
         self.tbl.item(NC,2).setText(f"{sx:.4f}")
+
+        # Llenar panel de propiedades
+        p=res.get('props',{})
+        def setp(row, key_v, key_l, fmt="{:.4f}"):
+            vv=p.get(key_v); vl=p.get(key_l)
+            self.tbl_prop.item(row,1).setText(fmt.format(vv) if vv is not None else "")
+            self.tbl_prop.item(row,2).setText(fmt.format(vl) if vl is not None else "")
+            self.tbl_prop.item(row,1).setForeground(QBrush(QColor(TEXT_RES)))
+            self.tbl_prop.item(row,2).setForeground(QBrush(QColor(TEXT_RES)))
+        setp(0,'PM_v','PM_l')
+        setp(1,'ZV','ZL')
+        setp(2,'rho_v','rho_l')
+        setp(3,'sg_v','sg_l')
