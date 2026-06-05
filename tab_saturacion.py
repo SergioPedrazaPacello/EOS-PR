@@ -72,14 +72,20 @@ class TabSaturacion(QWidget):
 
         # ── Panel de entrada ──────────────────────────────────
         in_box=QFrame()
-        in_box.setStyleSheet(f'background:{GRAY_LBL};border:none;')
+        in_box.setStyleSheet('background:transparent;border:none;')
         gl=QGridLayout(in_box); gl.setContentsMargins(6,6,6,6); gl.setSpacing(6)
 
         def lbl(txt, res=False):
             l=QLabel(txt)
-            l.setStyleSheet(LBL_RES if res else
-                f'background:{GRAY_LBL};border:1px solid {BORDER};'
-                f'padding:2px 6px;font-family:"{FONT_F}";font-size:{FS}pt;')
+            if res:
+                l.setStyleSheet(
+                    f'background:transparent;border:1px solid {BORDER};'
+                    f'color:{TEXT_RES};padding:2px 6px;'
+                    f'font-family:"{FONT_F}";font-size:{FS}pt;')
+            else:
+                l.setStyleSheet(
+                    f'background:transparent;border:1px solid {BORDER};'
+                    f'padding:2px 6px;font-family:"{FONT_F}";font-size:{FS}pt;')
             l.setFixedHeight(24)
             return l
 
@@ -99,8 +105,10 @@ class TabSaturacion(QWidget):
         self.lbl_cond.setFixedWidth(130)
         gl.addWidget(self.lbl_cond, 1, 0)
         self.sp_cond=QDoubleSpinBox()
-        self.sp_cond.setRange(0.01, 15000.0); self.sp_cond.setDecimals(2)
-        self.sp_cond.setValue(300.0); self.sp_cond.setFixedHeight(24)
+        self.sp_cond.setRange(0.0, 15000.0); self.sp_cond.setDecimals(2)
+        self.sp_cond.setSpecialValueText(" ")   # muestra vacío en el mínimo
+        self.sp_cond.setValue(0.0)              # inicia vacío
+        self.sp_cond.setFixedHeight(24)
         self.sp_cond.setFixedWidth(160)
         # Sin flechas de incremento/decremento
         self.sp_cond.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
@@ -125,18 +133,22 @@ class TabSaturacion(QWidget):
         root.addWidget(res_title)
 
         res_box=QFrame()
-        res_box.setStyleSheet(f'background:{GRAY_LBL};border:none;')
+        res_box.setStyleSheet('background:transparent;border:none;')
         rl=QGridLayout(res_box); rl.setContentsMargins(6,4,6,4); rl.setSpacing(4)
 
         self.lbl_res_label=lbl("Temperatura de rocio (°F):")
+        self.lbl_res_label.setFixedWidth(200)
         rl.addWidget(self.lbl_res_label, 0, 0)
         self.lbl_res_val=lbl("—", res=True)
+        self.lbl_res_val.setFixedWidth(120)
         self.lbl_res_val.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         rl.addWidget(self.lbl_res_val, 0, 1)
 
         self.lbl_res2_label=lbl("Equivalente (°R / psi):")
+        self.lbl_res2_label.setFixedWidth(200)
         rl.addWidget(self.lbl_res2_label, 1, 0)
         self.lbl_res2_val=lbl("—", res=True)
+        self.lbl_res2_val.setFixedWidth(120)
         self.lbl_res2_val.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         rl.addWidget(self.lbl_res2_val, 1, 1)
 
@@ -193,9 +205,10 @@ class TabSaturacion(QWidget):
         tipo, unidad, etiqueta, _ = self.TIPOS[txt]
         self.lbl_cond.setText(etiqueta)
         if unidad=='P':
-            self.sp_cond.setRange(0.01, 15000.0); self.sp_cond.setValue(300.0)
+            self.sp_cond.setRange(0.0, 15000.0)
         else:
-            self.sp_cond.setRange(1.0, 2000.0); self.sp_cond.setValue(500.0)
+            self.sp_cond.setRange(0.0, 2000.0)
+        # No forzar valor — dejar lo que el usuario haya puesto o vacío
 
     def calcular(self):
         z=self.get_z()
@@ -208,6 +221,11 @@ class TabSaturacion(QWidget):
         txt=self.cmb_tipo.currentText()
         tipo, unidad, etiqueta, res_unit = self.TIPOS[txt]
         valor=self.sp_cond.value()
+        if valor <= 0.0:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(self,"Dato faltante",
+                "Ingrese un valor de presion o temperatura.")
+            return
 
         self.btn.setEnabled(False); self.btn.setText("Calculando...")
         self.lbl_estado.setText("")
@@ -225,8 +243,7 @@ class TabSaturacion(QWidget):
     def _on_done(self, res):
         self.btn.setEnabled(True); self.btn.setText("Calcular punto de saturacion")
         if not res or not res.get('exito'):
-            self.lbl_estado.setText(
-                "No se encontró punto de saturación (condición fuera de la región bifásica).")
+            self.lbl_estado.setText("No se encontro punto de saturacion")
             self.lbl_res_val.setText("—"); self.lbl_res2_val.setText("—")
             return
 

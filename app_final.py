@@ -8,7 +8,8 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTabWidget, QTableWidget, QTableWidgetItem, QLabel, QPushButton,
     QDoubleSpinBox, QGridLayout, QFrame, QHeaderView,
-    QCheckBox, QMessageBox, QStatusBar, QAbstractItemView, QScrollArea, QComboBox
+    QCheckBox, QMessageBox, QStatusBar, QAbstractItemView, QScrollArea, QComboBox,
+    QAbstractSpinBox
 )
 import matplotlib
 matplotlib.use('QtAgg')
@@ -173,6 +174,7 @@ class TabEquilibrio(QWidget):
         self.sp_P = QDoubleSpinBox()
         self.sp_P.setRange(0,15000); self.sp_P.setDecimals(2)
         self.sp_P.setSpecialValueText(" "); self.sp_P.setValue(0)
+        self.sp_P.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.sp_P.setFixedHeight(22); self.sp_P.setFixedWidth(110)
         self.sp_P.setStyleSheet(
             f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
@@ -184,21 +186,57 @@ class TabEquilibrio(QWidget):
         self.sp_T.setRange(0.0, 9999.99)
         self.sp_T.setDecimals(2)
         self.sp_T.setSpecialValueText(" "); self.sp_T.setValue(0)
+        self.sp_T.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.sp_T.setFixedHeight(22); self.sp_T.setFixedWidth(110)
-        self.sp_T.setStyleSheet(
-            f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
-        self.sp_T.valueChanged.connect(
-            lambda v: self.lbl_F.setText("" if v<=0 else f"({v-459.67:.1f} °F)"))
         gl.addWidget(self.sp_T, 1, 1)
 
-        self.lbl_F = QLabel("")
-        self.lbl_F.setStyleSheet(
-            f'color:{TEXT_DIM};font-size:9pt;background:transparent;'
-            f'font-family:"{FONT_F}";')
-        self.lbl_F.setAlignment(
-            Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
-        gl.addWidget(self.lbl_F, 2, 1)
+        gl.addWidget(inp_lbl("Temperatura (°F):"), 2, 0)
+        self.sp_F = QDoubleSpinBox()
+        self.sp_F.setRange(-459.67, 9540.32)
+        self.sp_F.setDecimals(2)
+        self.sp_F.setSpecialValueText(" "); self.sp_F.setValue(-459.67)
+        self.sp_F.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+        self.sp_F.setFixedHeight(22); self.sp_F.setFixedWidth(110)
+        gl.addWidget(self.sp_F, 2, 1)
+
+        # Sincronización bidireccional °R ↔ °F
+        # El campo activo (donde se escribe) queda blanco; el otro queda gris
+        self._sync_lock = False
+        ACTIVO = WHITE
+        INACTIVO = "#B8B8B8"   # plomo más oscuro
+        def _style_T(activo):
+            self.sp_T.setStyleSheet(
+                f'QDoubleSpinBox {{ background:{ACTIVO if activo else INACTIVO};'
+                f'border:1px solid {BORDER};'
+                f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
+        def _style_F(activo):
+            self.sp_F.setStyleSheet(
+                f'QDoubleSpinBox {{ background:{ACTIVO if activo else INACTIVO};'
+                f'border:1px solid {BORDER};'
+                f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
+        self._style_T = _style_T; self._style_F = _style_F
+        _style_T(True); _style_F(False)
+
+        def _on_T_changed(v):
+            if self._sync_lock: return
+            self._sync_lock = True
+            if v <= 0:
+                self.sp_F.setValue(-459.67)   # vacío
+            else:
+                self.sp_F.setValue(v - 459.67)
+            _style_T(True); _style_F(False)
+            self._sync_lock = False
+        def _on_F_changed(v):
+            if self._sync_lock: return
+            self._sync_lock = True
+            if v <= -459.67:
+                self.sp_T.setValue(0)         # vacío
+            else:
+                self.sp_T.setValue(v + 459.67)
+            _style_F(True); _style_T(False)
+            self._sync_lock = False
+        self.sp_T.valueChanged.connect(_on_T_changed)
+        self.sp_F.valueChanged.connect(_on_F_changed)
 
 
         top.addWidget(pin,
