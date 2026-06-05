@@ -92,7 +92,7 @@ class TabSaturacion(QWidget):
         gl.addWidget(lbl("Calcular:"), 0, 0)
         self.cmb_tipo=QComboBox()
         self.cmb_tipo.addItems(list(self.TIPOS.keys()))
-        self.cmb_tipo.setFixedHeight(24); self.cmb_tipo.setFixedWidth(160)
+        self.cmb_tipo.setFixedHeight(24)
         self.cmb_tipo.setStyleSheet(
             f'QComboBox {{ background:{WHITE};border:1px solid {BORDER};'
             f'color:{TEXT};font-family:"{FONT_F}";font-size:{FS}pt; padding:1px 4px; }}')
@@ -108,7 +108,6 @@ class TabSaturacion(QWidget):
         self.sp_cond.setSpecialValueText(" ")   # muestra vacío en el mínimo
         self.sp_cond.setValue(0.0)              # inicia vacío
         self.sp_cond.setFixedHeight(24)
-        self.sp_cond.setFixedWidth(160)
         # Sin flechas de incremento/decremento
         self.sp_cond.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.sp_cond.setStyleSheet(
@@ -123,14 +122,11 @@ class TabSaturacion(QWidget):
         gl.addWidget(self.btn, 2, 0, 1, 2)
 
         gl.setColumnStretch(0,0); gl.setColumnStretch(1,1)
-        in_box.setFixedWidth(360)
 
         # ── Panel de resultados (a la derecha de la entrada) ──
-        RES_W = 320   # ancho del panel de resultados
         res_outer=QVBoxLayout(); res_outer.setSpacing(3)
         res_title=QLabel("Resultado:")
         res_title.setStyleSheet(LBL_SEC); res_title.setFixedHeight(22)
-        res_title.setFixedWidth(RES_W)
         res_outer.addWidget(res_title)
 
         res_box=QFrame()
@@ -158,20 +154,17 @@ class TabSaturacion(QWidget):
 
         # Etiqueta estira para llenar, valor fijo a la derecha → sin huecos
         rl.setColumnStretch(0,1); rl.setColumnStretch(1,0)
-        res_box.setFixedWidth(RES_W)
         res_outer.addWidget(res_box)
 
-        # Layout horizontal: entrada (izq) + resultado (der)
+        # Layout horizontal: entrada (izq) + resultado (der), repartido 50/50
         top_row=QHBoxLayout(); top_row.setSpacing(10)
-        # La entrada va en su propio contenedor con el título de entrada vacío arriba
         in_wrap=QVBoxLayout(); in_wrap.setSpacing(3)
         in_title=QLabel("Datos de entrada:")
         in_title.setStyleSheet(LBL_SEC); in_title.setFixedHeight(22)
         in_wrap.addWidget(in_title)
         in_wrap.addWidget(in_box)
-        top_row.addLayout(in_wrap)
-        top_row.addLayout(res_outer)
-        top_row.addStretch()
+        top_row.addLayout(in_wrap, 1)      # entrada ocupa mitad
+        top_row.addLayout(res_outer, 1)    # resultado ocupa mitad
         top_row.setAlignment(Qt.AlignmentFlag.AlignTop)
         root.addLayout(top_row)
 
