@@ -123,31 +123,31 @@ class TabSaturacion(QWidget):
         gl.addWidget(self.btn, 2, 0, 1, 2)
 
         gl.setColumnStretch(0,0); gl.setColumnStretch(1,1)
-        in_box.setMaximumWidth(360)
-        root.addWidget(in_box, alignment=Qt.AlignmentFlag.AlignLeft)
+        in_box.setFixedWidth(360)
 
-        # ── Panel de resultados ───────────────────────────────
+        # ── Panel de resultados (a la derecha de la entrada) ──
+        res_outer=QVBoxLayout(); res_outer.setSpacing(3)
         res_title=QLabel("Resultado:")
         res_title.setStyleSheet(LBL_SEC); res_title.setFixedHeight(22)
-        root.addWidget(res_title)
+        res_outer.addWidget(res_title)
 
         res_box=QFrame()
         res_box.setStyleSheet('background:transparent;border:none;')
         rl=QGridLayout(res_box); rl.setContentsMargins(6,4,6,4); rl.setSpacing(4)
 
         self.lbl_res_label=lbl("Temperatura de rocio (°F):")
-        self.lbl_res_label.setFixedWidth(200)
+        self.lbl_res_label.setFixedWidth(180)
         rl.addWidget(self.lbl_res_label, 0, 0)
         self.lbl_res_val=lbl("", res=True)
-        self.lbl_res_val.setFixedWidth(120)
+        self.lbl_res_val.setFixedWidth(110)
         self.lbl_res_val.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         rl.addWidget(self.lbl_res_val, 0, 1)
 
         self.lbl_res2_label=lbl("Equivalente (°R / psi):")
-        self.lbl_res2_label.setFixedWidth(200)
+        self.lbl_res2_label.setFixedWidth(180)
         rl.addWidget(self.lbl_res2_label, 1, 0)
         self.lbl_res2_val=lbl("", res=True)
-        self.lbl_res2_val.setFixedWidth(120)
+        self.lbl_res2_val.setFixedWidth(110)
         self.lbl_res2_val.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         rl.addWidget(self.lbl_res2_val, 1, 1)
 
@@ -157,8 +157,22 @@ class TabSaturacion(QWidget):
         rl.addWidget(self.lbl_estado, 2, 0, 1, 2)
 
         rl.setColumnStretch(0,0); rl.setColumnStretch(1,1)
-        res_box.setMaximumWidth(360)
-        root.addWidget(res_box, alignment=Qt.AlignmentFlag.AlignLeft)
+        res_outer.addWidget(res_box)
+        res_outer.addStretch()
+
+        # Layout horizontal: entrada (izq) + resultado (der)
+        top_row=QHBoxLayout(); top_row.setSpacing(10)
+        # La entrada va en su propio contenedor con el título de entrada vacío arriba
+        in_wrap=QVBoxLayout(); in_wrap.setSpacing(3)
+        in_spacer=QLabel(""); in_spacer.setFixedHeight(22)
+        in_spacer.setStyleSheet('background:transparent;border:none;')
+        in_wrap.addWidget(in_spacer)
+        in_wrap.addWidget(in_box)
+        in_wrap.addStretch()
+        top_row.addLayout(in_wrap)
+        top_row.addLayout(res_outer)
+        top_row.addStretch()
+        root.addLayout(top_row)
 
         # ── Tabla de composiciones de las fases ───────────────
         comp_title=QLabel("Composicion de las fases en equilibrio:")
@@ -182,6 +196,9 @@ class TabSaturacion(QWidget):
         hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         self.tbl.setColumnWidth(1,130); self.tbl.setColumnWidth(2,130)
         self.tbl.verticalHeader().setDefaultSectionSize(20)
+        self.tbl.horizontalHeader().setFixedHeight(24)
+        # Altura fija para mostrar todas las filas sin scrollbar
+        self.tbl.setFixedHeight((NC+1)*20 + 24 + 4)
         self.tbl.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.tbl.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
@@ -208,7 +225,7 @@ class TabSaturacion(QWidget):
             cell.setBackground(QBrush(BLANCO))
             self.tbl.setItem(NC,c,cell)
 
-        root.addWidget(self.tbl, stretch=1)
+        root.addWidget(self.tbl)
 
         # ── Panel de propiedades del punto de saturación ──────
         prop_title=QLabel("Propiedades del punto de saturacion:")
@@ -233,6 +250,7 @@ class TabSaturacion(QWidget):
         hp.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         self.tbl_prop.setColumnWidth(1,130); self.tbl_prop.setColumnWidth(2,130)
         self.tbl_prop.verticalHeader().setDefaultSectionSize(20)
+        self.tbl_prop.horizontalHeader().setFixedHeight(24)
         self.tbl_prop.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.tbl_prop.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
@@ -250,7 +268,7 @@ class TabSaturacion(QWidget):
                 cc.setBackground(QBrush(BLANCO_P))
                 self.tbl_prop.setItem(r,c,cc)
         self.tbl_prop.setRowCount(4)
-        self.tbl_prop.setMaximumHeight(4*20 + 26)
+        self.tbl_prop.setFixedHeight(4*20 + 24 + 4)
         root.addWidget(self.tbl_prop)
 
     def _on_tipo_change(self, txt):
