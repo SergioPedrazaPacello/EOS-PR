@@ -424,6 +424,85 @@ def propiedades_punto(T, P, x, y, kij=None, metodo_densidad='COSTALD'):
 
     return out
 
+
+def T_wilson_rocio(z, P, T0=500.0, max_it=200):
+    """T inicial que resuelve SUM(zi/Kw)=1 (rocío) por Newton."""
+    T = T0
+    for _ in range(max_it):
+        f = sum(z[i]/Ki_wilson(i,T,P) if z[i]>0 else 0 for i in range(NC)) - 1.0
+        df = 0.0
+        for i in range(NC):
+            if z[i]==0: continue
+            kw = Ki_wilson(i,T,P)
+            # d(1/Kw)/dT = -(1/Kw)*(WILSON_C*(1+w)*Tc/T^2)
+            df += -z[i]/kw*(WILSON_C*(1+OMEGA[i])*TC[i]/T**2)
+        if abs(df) < 1e-30: break
+        T_new = T - f/df
+        if T_new <= 0: T_new = T*0.5
+        if abs(T_new-T) < 1e-6: return T_new
+        T = T_new
+    return T
+
+def P_wilson_sat(z, T, tipo, P0=100.0, max_it=200):
+    """P inicial que resuelve la ecuación de Wilson de saturación por Newton.
+    tipo 'B': SUM(zi*Kw)=1 ; tipo 'D': SUM(zi/Kw)=1."""
+    P = P0
+    for _ in range(max_it):
+        if tipo=='B':
+            f = sum(z[i]*Ki_wilson(i,T,P) for i in range(NC)) - 1.0
+            # dKw/dP = -Kw/P  → d(SUM z*Kw)/dP = -SUM(z*Kw)/P
+            df = -sum(z[i]*Ki_wilson(i,T,P) for i in range(NC))/P
+        else:
+            f = sum(z[i]/Ki_wilson(i,T,P) if z[i]>0 else 0 for i in range(NC)) - 1.0
+            # d(1/Kw)/dP = (1/Kw)/P  → d(SUM z/Kw)/dP = SUM(z/Kw)/P
+            df = sum(z[i]/Ki_wilson(i,T,P) if z[i]>0 else 0 for i in range(NC))/P
+        if abs(df) < 1e-30: break
+        P_new = P - f/df
+        if P_new <= 0.1: P_new = P*0.5
+        if abs(P_new-P) < 1e-4: return P_new
+        P = P_new
+    return max(P, 1.0)
+
+def _comp_inicial(tipo, z, T, P):
+    """Composición iterada inicial (Yi rocío / Xi rocío) según Wilson."""
+    Kw = [Ki_wilson(i, max(T,50), P) for i in range(NC)]
+    if tipo=='B':
+        s = sum(z[i]*Kw[i] for i in range(NC))
+        return [z[i]*Kw[i]/s for i in range(NC)]
+    else:
+        s = sum(z[i]/Kw[i] if Kw[i]>1e-30 else 1e30 for i in range(NC))
+        return [z[i]/Kw[i]/s if Kw[i]>1e-30 else 0 for i in range(NC)]
+
+def _es_trivial(Ki, umbral=0.5):
+    """Detecta solución trivial (todos los Ki cercanos a 1)."""
+    return sum((k-1)**2 for k in Ki) < umbral
+
+def _resolver_con_reintentos(tipo, var_it, val_fijo, z, kij,
+                             arranques, comp_func):
+    """
+    Intenta encontrar el punto de saturación desde varios valores de arranque.
+    Acepta el primer resultado que converja y NO sea solución trivial.
+    tipo: 'B'/'D'; var_it: 'T'/'P'; val_fijo: la condición fija (P si var_it='T').
+    arranques: lista de valores iniciales para la variable a iterar.
+    comp_func(T,P): retorna la composición inicial.
+    Retorna (T, P, Ki, comp, exito).
+    """
+    mejor = None
+    for v0 in arranques:
+        if var_it == 'T':
+            T_in, P_in = v0, val_fijo
+        else:
+            T_in, P_in = val_fijo, v0
+        comp0 = comp_func(T_in, P_in)
+        T,P,Ki,comp,ok = encontrar_punto(tipo, var_it, T_in, P_in, comp0,
+                                         z, kij, tol_comp=1e-11, max_ext=2000)
+        if ok and not _es_trivial(Ki):
+            return T, P, Ki, comp, True
+    # Si ningún arranque dio solución NO trivial, no hay punto de saturación
+    return (val_fijo if var_it=='P' else 0.0,
+            val_fijo if var_it=='T' else 0.0,
+            [1.0]*NC, list(z), False)
+
 def punto_saturacion(tipo_calc, valor, z, kij=None):
     """
     Calcula un punto de saturación individual.
@@ -435,46 +514,46 @@ def punto_saturacion(tipo_calc, valor, z, kij=None):
 
     if tipo_calc == 'T_rocio':
         P = valor
-        T0 = T_inicial_wilson(z, P)
-        Kw = [Ki_wilson(i, max(T0,50), P) for i in range(NC)]
-        s = sum(z[i]/Kw[i] if Kw[i]>1e-30 else 1e30 for i in range(NC))
-        comp0 = [z[i]/Kw[i]/s if Kw[i]>1e-30 else 0 for i in range(NC)]
-        T,Pf,Ki,comp,ok = encontrar_punto('D','T',T0,P,comp0,z,kij,
-                                          tol_comp=1e-11, max_ext=2000)
+        # Wilson correcto para rocío: SUM(z/Kw)=1
+        T_w = T_wilson_rocio(z, P)
+        # Arranques múltiples alrededor del estimado Wilson
+        arranques = [T_w, T_w+40, T_w-40, T_w+80, T_w-80, 450, 550, 650]
+        T,P,Ki,comp,ok = _resolver_con_reintentos(
+            'D','T',P,z,kij,arranques,
+            lambda Ti,Pi: _comp_inicial('D',z,Ti,Pi))
         props = propiedades_punto(T,P,comp,list(z),kij) if ok else {}
         return {'T':T,'P':P,'y':list(z),'x':comp,'Ki':Ki,'exito':ok,'props':props}
 
     elif tipo_calc == 'T_burbuja':
         P = valor
-        T0 = T_inicial_wilson(z, P)
-        Kw = [Ki_wilson(i, max(T0,50), P) for i in range(NC)]
-        s = sum(z[i]*Kw[i] for i in range(NC))
-        comp0 = [z[i]*Kw[i]/s for i in range(NC)]
-        T,Pf,Ki,comp,ok = encontrar_punto('B','T',T0,P,comp0,z,kij,
-                                          tol_comp=1e-11, max_ext=2000)
+        # Wilson correcto para burbuja: SUM(z*Kw)=1
+        T_w = T_inicial_wilson(z, P)
+        arranques = [T_w, T_w+40, T_w-40, T_w+80, T_w-80, 350, 450, 550]
+        T,P,Ki,comp,ok = _resolver_con_reintentos(
+            'B','T',P,z,kij,arranques,
+            lambda Ti,Pi: _comp_inicial('B',z,Ti,Pi))
         props = propiedades_punto(T,P,list(z),comp,kij) if ok else {}
         return {'T':T,'P':P,'x':list(z),'y':comp,'Ki':Ki,'exito':ok,'props':props}
 
     elif tipo_calc == 'P_rocio':
         T = valor
-        # Estimar P inicial por Wilson (buscar P donde SUM(z/K)=1)
-        P0 = 100.0
-        Kw = [Ki_wilson(i, max(T,50), P0) for i in range(NC)]
-        s = sum(z[i]/Kw[i] if Kw[i]>1e-30 else 1e30 for i in range(NC))
-        comp0 = [z[i]/Kw[i]/s if Kw[i]>1e-30 else 0 for i in range(NC)]
-        T2,P,Ki,comp,ok = encontrar_punto('D','P',T,P0,comp0,z,kij,
-                                          tol_comp=1e-11, max_ext=2000)
+        # Wilson correcto para rocío sobre P: SUM(z/Kw)=1
+        P_w = P_wilson_sat(z, T, 'D')
+        arranques = [P_w, P_w*1.5, P_w*0.6, P_w*2.5, P_w*0.3, 100, 400, 800]
+        T,P,Ki,comp,ok = _resolver_con_reintentos(
+            'D','P',T,z,kij,arranques,
+            lambda Ti,Pi: _comp_inicial('D',z,Ti,Pi))
         props = propiedades_punto(T,P,comp,list(z),kij) if ok else {}
         return {'T':T,'P':P,'y':list(z),'x':comp,'Ki':Ki,'exito':ok,'props':props}
 
     elif tipo_calc == 'P_burbuja':
         T = valor
-        P0 = 100.0
-        Kw = [Ki_wilson(i, max(T,50), P0) for i in range(NC)]
-        s = sum(z[i]*Kw[i] for i in range(NC))
-        comp0 = [z[i]*Kw[i]/s for i in range(NC)]
-        T2,P,Ki,comp,ok = encontrar_punto('B','P',T,P0,comp0,z,kij,
-                                          tol_comp=1e-11, max_ext=2000)
+        # Wilson correcto para burbuja sobre P: SUM(z*Kw)=1
+        P_w = P_wilson_sat(z, T, 'B')
+        arranques = [P_w, P_w*1.5, P_w*0.6, P_w*2.5, P_w*0.3, 100, 400, 800]
+        T,P,Ki,comp,ok = _resolver_con_reintentos(
+            'B','P',T,z,kij,arranques,
+            lambda Ti,Pi: _comp_inicial('B',z,Ti,Pi))
         props = propiedades_punto(T,P,list(z),comp,kij) if ok else {}
         return {'T':T,'P':P,'x':list(z),'y':comp,'Ki':Ki,'exito':ok,'props':props}
 

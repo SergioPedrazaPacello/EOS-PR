@@ -186,6 +186,7 @@ class TabSaturacion(QWidget):
         self.tbl.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         GRIS_NOMBRE = QColor("#E8E8E8")   # gris claro para nombres
+        BLANCO = QColor(WHITE)
         for i in range(NC):
             it=QTableWidgetItem(NOMBRES[i].rstrip(':'))
             it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
@@ -194,6 +195,7 @@ class TabSaturacion(QWidget):
             for c in (1,2):
                 cell=QTableWidgetItem("")
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+                cell.setBackground(QBrush(BLANCO))
                 self.tbl.setItem(i,c,cell)
         # Fila sumatorias
         sit=QTableWidgetItem("Sumatorias:")
@@ -203,6 +205,7 @@ class TabSaturacion(QWidget):
         for c in (1,2):
             cell=QTableWidgetItem("")
             cell.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+            cell.setBackground(QBrush(BLANCO))
             self.tbl.setItem(NC,c,cell)
 
         root.addWidget(self.tbl, stretch=1)
@@ -235,7 +238,7 @@ class TabSaturacion(QWidget):
 
         _props=["Peso molecular","Factor de compresibilidad",
                 "Densidad masica [lb/ft3]","Gravedad especifica"]
-        GRIS=QColor("#E8E8E8")
+        GRIS=QColor("#E8E8E8"); BLANCO_P=QColor(WHITE)
         for r,lbl_p in enumerate(_props):
             it=QTableWidgetItem(lbl_p)
             it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
@@ -244,6 +247,7 @@ class TabSaturacion(QWidget):
             for c in (1,2):
                 cc=QTableWidgetItem("")
                 cc.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+                cc.setBackground(QBrush(BLANCO_P))
                 self.tbl_prop.setItem(r,c,cc)
         self.tbl_prop.setRowCount(4)
         self.tbl_prop.setMaximumHeight(4*20 + 26)
