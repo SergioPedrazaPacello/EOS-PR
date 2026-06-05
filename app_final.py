@@ -295,7 +295,8 @@ class TabEquilibrio(QWidget):
         self.cmb_dens.addItems(["COSTALD", "EOS"])
         self.cmb_dens.setFixedHeight(22); self.cmb_dens.setFixedWidth(110)
         self.cmb_dens.setStyleSheet(
-            f'QComboBox {{ font-family:"{FONT_F}";font-size:{FS}pt; }}')
+            f'QComboBox {{ background:{WHITE};border:1px solid {BORDER};'
+            f'color:{TEXT};font-family:"{FONT_F}";font-size:{FS}pt; padding:1px 4px; }}')
         dens_row.addWidget(self.cmb_dens, alignment=Qt.AlignmentFlag.AlignVCenter)
         rp.addLayout(dens_row)
         rp.addStretch(2)   # equilibra el bloque hacia el centro

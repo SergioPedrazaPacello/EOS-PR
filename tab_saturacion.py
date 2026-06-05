@@ -95,7 +95,8 @@ class TabSaturacion(QWidget):
         self.cmb_tipo.addItems(list(self.TIPOS.keys()))
         self.cmb_tipo.setFixedHeight(24); self.cmb_tipo.setFixedWidth(160)
         self.cmb_tipo.setStyleSheet(
-            f'QComboBox {{ font-family:"{FONT_F}";font-size:{FS}pt; }}')
+            f'QComboBox {{ background:{WHITE};border:1px solid {BORDER};'
+            f'color:{TEXT};font-family:"{FONT_F}";font-size:{FS}pt; padding:1px 4px; }}')
         self.cmb_tipo.currentTextChanged.connect(self._on_tipo_change)
         gl.addWidget(self.cmb_tipo, 0, 1)
 
@@ -180,6 +181,8 @@ class TabSaturacion(QWidget):
         hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         self.tbl.setColumnWidth(1,130); self.tbl.setColumnWidth(2,130)
         self.tbl.verticalHeader().setDefaultSectionSize(20)
+        self.tbl.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.tbl.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         GRIS_NOMBRE = QColor("#E8E8E8")   # gris claro para nombres
         for i in range(NC):
@@ -224,6 +227,8 @@ class TabSaturacion(QWidget):
         hp.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         self.tbl_prop.setColumnWidth(1,130); self.tbl_prop.setColumnWidth(2,130)
         self.tbl_prop.verticalHeader().setDefaultSectionSize(20)
+        self.tbl_prop.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.tbl_prop.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         _props=["Peso molecular","Factor de compresibilidad",
                 "Densidad masica [lb/ft3]","Gravedad especifica"]
