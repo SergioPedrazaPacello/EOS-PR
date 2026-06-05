@@ -158,7 +158,6 @@ class TabSaturacion(QWidget):
 
         rl.setColumnStretch(0,0); rl.setColumnStretch(1,1)
         res_outer.addWidget(res_box)
-        res_outer.addStretch()
 
         # Layout horizontal: entrada (izq) + resultado (der)
         top_row=QHBoxLayout(); top_row.setSpacing(10)
@@ -168,10 +167,10 @@ class TabSaturacion(QWidget):
         in_spacer.setStyleSheet('background:transparent;border:none;')
         in_wrap.addWidget(in_spacer)
         in_wrap.addWidget(in_box)
-        in_wrap.addStretch()
         top_row.addLayout(in_wrap)
         top_row.addLayout(res_outer)
         top_row.addStretch()
+        top_row.setAlignment(Qt.AlignmentFlag.AlignTop)
         root.addLayout(top_row)
 
         # ── Tabla de composiciones de las fases ───────────────
@@ -195,12 +194,12 @@ class TabSaturacion(QWidget):
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         self.tbl.setColumnWidth(1,130); self.tbl.setColumnWidth(2,130)
-        self.tbl.verticalHeader().setDefaultSectionSize(20)
-        self.tbl.horizontalHeader().setFixedHeight(24)
-        # Altura fija para mostrar todas las filas sin scrollbar
-        self.tbl.setFixedHeight((NC+1)*20 + 24 + 4)
-        self.tbl.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.tbl.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.tbl.verticalHeader().setDefaultSectionSize(22)
+        self.tbl.horizontalHeader().setFixedHeight(26)
+        # Altura fija para mostrar TODAS las filas sin scrollbar vertical
+        self.tbl.setFixedHeight((NC+1)*22 + 26 + 4)
+        self.tbl.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.tbl.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         GRIS_NOMBRE = QColor("#E8E8E8")   # gris claro para nombres
         BLANCO = QColor(WHITE)
@@ -249,10 +248,10 @@ class TabSaturacion(QWidget):
         hp.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         hp.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         self.tbl_prop.setColumnWidth(1,130); self.tbl_prop.setColumnWidth(2,130)
-        self.tbl_prop.verticalHeader().setDefaultSectionSize(20)
-        self.tbl_prop.horizontalHeader().setFixedHeight(24)
-        self.tbl_prop.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.tbl_prop.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.tbl_prop.verticalHeader().setDefaultSectionSize(22)
+        self.tbl_prop.horizontalHeader().setFixedHeight(26)
+        self.tbl_prop.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.tbl_prop.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         _props=["Peso molecular","Factor de compresibilidad",
                 "Densidad masica [lb/ft3]","Gravedad especifica"]
@@ -268,8 +267,9 @@ class TabSaturacion(QWidget):
                 cc.setBackground(QBrush(BLANCO_P))
                 self.tbl_prop.setItem(r,c,cc)
         self.tbl_prop.setRowCount(4)
-        self.tbl_prop.setFixedHeight(4*20 + 24 + 4)
+        self.tbl_prop.setFixedHeight(4*22 + 26 + 4)
         root.addWidget(self.tbl_prop)
+        root.addStretch()   # el espacio sobrante va al fondo, no entre tablas
 
     def _on_tipo_change(self, txt):
         tipo, unidad, etiqueta, _ = self.TIPOS[txt]
