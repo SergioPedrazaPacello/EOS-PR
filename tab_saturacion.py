@@ -59,8 +59,7 @@ class TabSaturacion(QWidget):
         self._build()
 
     def _build(self):
-        self.setObjectName('satTab')
-        self.setStyleSheet(f'QWidget#satTab {{ background:{GRAY_LBL}; }}')
+        self.setStyleSheet(f'background:{GRAY_LBL};')
         root=QVBoxLayout(self)
         root.setContentsMargins(4,10,4,4); root.setSpacing(3)
 
@@ -170,9 +169,11 @@ class TabSaturacion(QWidget):
         self.tbl.setHorizontalHeaderLabels(["Componente","Fase Vapor","Fase Liquida"])
         self.tbl.verticalHeader().setVisible(False)
         self.tbl.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.tbl.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.tbl.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.tbl.setStyleSheet(
-            f'QTableWidget {{ background:{WHITE};gridline-color:{BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt; }}'
+            f'QTableWidget {{ border:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
             f'QHeaderView::section {{ background:{GRAY_HDR};border:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt;padding:2px; }}')
         hh=self.tbl.horizontalHeader()
@@ -216,9 +217,11 @@ class TabSaturacion(QWidget):
             ["Propiedad","Fase Vapor","Fase Liquida"])
         self.tbl_prop.verticalHeader().setVisible(False)
         self.tbl_prop.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.tbl_prop.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.tbl_prop.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.tbl_prop.setStyleSheet(
-            f'QTableWidget {{ background:{WHITE};gridline-color:{BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt; }}'
+            f'QTableWidget {{ border:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
             f'QHeaderView::section {{ background:{GRAY_HDR};border:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt;padding:2px; }}')
         hp=self.tbl_prop.horizontalHeader()
