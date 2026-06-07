@@ -35,13 +35,30 @@ LBL_RES=(f'background:{GRAY_RES};border:1px solid {BORDER};'
 
 class EnvWorker(QThread):
     done=pyqtSignal(dict); error=pyqtSignal(str)
-    def __init__(self, z, kij):
-        super().__init__(); self.z=z; self.kij=kij
+    def __init__(self, z, kij, metodo='ziervogel'):
+        super().__init__(); self.z=z; self.kij=kij; self.metodo=metodo
     def run(self):
         try:
-            from envelope import curva_envolvente
-            res=curva_envolvente(self.z, self.kij)
-            self.done.emit(res)
+            if self.metodo=='michelsen':
+                from envelope_michelsen import construir_envolvente
+                r=construir_envolvente(self.z, self.kij)
+                env=r.get('envolvente',[]); crit=r.get('critico')
+                # Partir el trazo continuo en burbuja/rocío en el punto crítico
+                if crit is not None and env:
+                    # índice del punto más cercano al crítico
+                    ic=min(range(len(env)),
+                           key=lambda i:(env[i][0]-crit[0])**2+(env[i][1]-crit[1])**2)
+                    burb=env[:ic+1]; rocio=env[ic:]
+                else:
+                    burb=env; rocio=[]
+                res={'burbuja':burb,'rocio':rocio,
+                     'critico_burbuja':crit is not None,
+                     'critico_rocio':crit is not None,'critico':crit}
+                self.done.emit(res)
+            else:
+                from envelope import curva_envolvente
+                res=curva_envolvente(self.z, self.kij)
+                self.done.emit(res)
         except Exception as e:
             self.error.emit(str(e))
 
@@ -95,6 +112,22 @@ class TabEnvolvente(QWidget):
         right=QWidget(); right.setFixedWidth(210)
         vr=QVBoxLayout(right); vr.setContentsMargins(0,0,0,0); vr.setSpacing(6)
 
+        # Selector de método de cálculo
+        from PyQt6.QtWidgets import QComboBox
+        met_lbl=QLabel("Metodo:")
+        met_lbl.setStyleSheet(
+            f'font-family:"{FONT_F}";font-size:{FS}pt;color:{TEXT};'
+            f'background:transparent;')
+        met_lbl.setFixedHeight(16)
+        vr.addWidget(met_lbl)
+        self.cmb_metodo=QComboBox()
+        self.cmb_metodo.addItems(["Ziervogel-Poling","Michelsen"])
+        self.cmb_metodo.setFixedHeight(24)
+        self.cmb_metodo.setStyleSheet(
+            f'QComboBox {{ background:{WHITE};border:1px solid {BORDER};'
+            f'color:{TEXT};font-family:"{FONT_F}";font-size:{FS}pt; padding:1px 4px; }}')
+        vr.addWidget(self.cmb_metodo)
+
         self.btn=QPushButton("Calcular Envolvente")
         self.btn.setStyleSheet(BTN_STYLE); self.btn.setFixedHeight(30)
         self.btn.clicked.connect(self.calcular)
@@ -125,7 +158,7 @@ class TabEnvolvente(QWidget):
                    f'color:{TEXT};background:transparent;')
 
         def res_val():
-            l=QLabel("—"); l.setStyleSheet(LBL_RES)
+            l=QLabel(""); l.setStyleSheet(LBL_RES)
             l.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
             return l
 
@@ -157,9 +190,10 @@ class TabEnvolvente(QWidget):
                 "La suma de fracciones debe ser 1.0")
             return
         kij=self.get_kij()
+        metodo = 'michelsen' if self.cmb_metodo.currentIndex()==1 else 'ziervogel'
         self.btn.setEnabled(False); self.btn.setText("Calculando...")
         self.prog.setVisible(True)
-        self.worker=EnvWorker(z,kij)
+        self.worker=EnvWorker(z,kij,metodo)
         self.worker.done.connect(self._on_done)
         self.worker.error.connect(self._on_error)
         self.worker.start()
@@ -235,14 +269,14 @@ class TabEnvolvente(QWidget):
 
     def _update_results(self,res):
         burb=res.get('burbuja',[]); rocio=res.get('rocio',[])
-        def fv(v): return f"{v:.1f}" if v is not None else "—"
+        def fv(v): return f"{v:.1f}" if v is not None else ""
         Tb=[t-459.67 for _,t in burb]; Pb=[p for p,_ in burb]
         Td=[t-459.67 for _,t in rocio]; Pd=[p for p,_ in rocio]
         all_T=Tb+Td; all_P=Pb+Pd
         # Cricondentérmica = T máxima de la envolvente
-        self.res_labels['cric_T'].setText(fv(max(all_T)) if all_T else "—")
+        self.res_labels['cric_T'].setText(fv(max(all_T)) if all_T else "")
         # Cricondenbárica = P máxima de la envolvente
-        self.res_labels['cric_P'].setText(fv(max(all_P)) if all_P else "—")
+        self.res_labels['cric_P'].setText(fv(max(all_P)) if all_P else "")
 
     def exportar_csv(self):
         if not self.result: return
