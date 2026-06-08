@@ -29,6 +29,94 @@ R_GAS = 10.7316
 WILSON_C = np.log(10.0) * (7.0/3.0)
 kij_g = None   # kij global, fijado en construir_envolvente
 
+# ════════════════════════════════════════════════════════════════════
+# EVALUADOR EOS VECTORIZADO (idéntico a engine3, pero rápido)
+# - matriz aij cacheada por T (solo depende de T)
+# - am y ln_phi vectorizados con numpy
+# - solve_Z por Cardano analítico (sin np.roots)
+# Mismas ecuaciones de Peng-Robinson -> misma precisión y mismo método.
+# ════════════════════════════════════════════════════════════════════
+from engine3 import ai as _ai_f, bi as _bi_f, mi as _mi_f
+
+_AI = np.array([_ai_f(i) for i in range(NC)])
+_BI = np.array([_bi_f(i) for i in range(NC)])
+_MI = np.array([_mi_f(i) for i in range(NC)])
+_TC = np.array(TC)
+_SQRT2 = np.sqrt(2.0)
+_aij_cache = {}
+_one_minus_kij = None   # (1 - kij) como matriz, fijada por run
+
+def _set_kij(kij):
+    global _one_minus_kij, _aij_cache
+    _one_minus_kij = 1.0 - np.array(kij)
+    _aij_cache = {}
+
+def _aij_T(T):
+    """Matriz aij(T) cacheada (solo depende de T)."""
+    key = round(float(T), 6)
+    M = _aij_cache.get(key)
+    if M is None:
+        alpha = (1.0 + _MI*(1.0 - np.sqrt(T/_TC)))**2
+        aa = _AI*alpha                       # ai_alpha vector
+        s = np.sqrt(aa)
+        M = np.outer(s, s) * _one_minus_kij  # aij = sqrt(aa_i aa_j)(1-kij)
+        _aij_cache[key] = M
+    return M
+
+def _cardano_Z(A, B):
+    """Raíces (ZV mayor, ZL menor) de la cúbica PR por Cardano."""
+    a2 = -(1.0 - B)
+    a1 = A - 3.0*B*B - 2.0*B
+    a0 = -(A*B - B*B - B*B*B)
+    # cúbica z^3 + a2 z^2 + a1 z + a0 = 0
+    p = a1 - a2*a2/3.0
+    q = 2.0*a2**3/27.0 - a2*a1/3.0 + a0
+    disc = (q*q)/4.0 + (p*p*p)/27.0
+    shift = a2/3.0
+    if disc > 0:
+        sq = np.sqrt(disc)
+        u = np.cbrt(-q/2.0 + sq)
+        v = np.cbrt(-q/2.0 - sq)
+        z = u + v - shift
+        roots = [z]
+    else:
+        r = np.sqrt(-(p**3)/27.0) if p < 0 else 0.0
+        if r < 1e-300:
+            roots = [-shift]
+        else:
+            phi = np.arccos(max(-1.0, min(1.0, -q/2.0/r)))
+            m = 2.0*np.sqrt(-p/3.0)
+            roots = [m*np.cos((phi+2.0*np.pi*k)/3.0) - shift for k in range(3)]
+    real = [zz for zz in roots if zz > B]
+    if not real:
+        real = [max(roots)]
+    real.sort()
+    return real[-1], real[0]
+
+def _lnphi_vec(comp, T, P, vapor):
+    """Vector ln(phi_i) para todos los componentes (vectorizado)."""
+    M = _aij_T(T)
+    Mc = M @ comp                 # sum_j comp_j aij  (vector)
+    am_v = float(comp @ Mc)       # am = comp·M·comp
+    bm_v = float(_BI @ comp)
+    A = am_v*P/(R_GAS*T)**2
+    B = bm_v*P/(R_GAS*T)
+    ZV, ZL = _cardano_Z(A, B)
+    Z = ZV if vapor else ZL
+    if Z <= B:
+        Z = B + 1e-12
+    t1 = (_BI/bm_v)*(Z-1.0)
+    t2 = -np.log(Z-B)
+    denom = Z + (1.0-_SQRT2)*B
+    numer = Z + (1.0+_SQRT2)*B
+    if denom <= 0: denom = 1e-12
+    if numer <= 0: numer = 1e-12
+    t3 = A/(2.0*_SQRT2*B)*np.log(numer/denom)
+    t4 = (2.0*Mc/am_v - _BI/bm_v)*t3
+    return t1 + t2 - t4, Z
+
+
+
 
 def _Ki_wilson(i, T, P):
     return (PC[i]/P) * np.exp(WILSON_C*(1+OMEGA[i])*(1-TC[i]/T))
@@ -94,12 +182,25 @@ def _jacobiano(X, z, act, spec, h=1e-6):
 
 
 def _resolver_punto(X0, z, act, spec, tol=1e-9, max_it=40):
+    """
+    Newton-Raphson MODIFICADO: calcula el Jacobiano una vez y lo reutiliza
+    mientras la convergencia avance bien (metodo de la cuerda). Recalcula el
+    Jacobiano solo si una iteracion no reduce el residual. Como el predictor
+    por tangente da un arranque excelente, esto reduce mucho los calculos de
+    Jacobiano SIN cambiar el punto al que converge (la solucion la define
+    G(X)=0, no el Jacobiano) -> precision identica, metodo intacto.
+    """
     X = X0.copy()
+    G = _funciones(X, z, act, spec)
+    res = np.linalg.norm(G, ord=np.inf)
+    if res < tol:
+        return X, True
+    J = _jacobiano(X, z, act, spec)
+    refrescar = False
     for _ in range(max_it):
-        G = _funciones(X, z, act, spec)
-        if np.linalg.norm(G, ord=np.inf) < tol:
-            return X, True
-        J = _jacobiano(X, z, act, spec)
+        if refrescar:
+            J = _jacobiano(X, z, act, spec)
+            refrescar = False
         try:
             dX = np.linalg.solve(J, -G)
         except np.linalg.LinAlgError:
@@ -108,8 +209,15 @@ def _resolver_punto(X0, z, act, spec, tol=1e-9, max_it=40):
         if mx > 0.5:
             dX *= 0.5/mx
         X = X + dX
-    G = _funciones(X, z, act, spec)
-    return X, (np.linalg.norm(G, ord=np.inf) < tol*100)
+        G = _funciones(X, z, act, spec)
+        res_new = np.linalg.norm(G, ord=np.inf)
+        if res_new < tol:
+            return X, True
+        # Si el paso no mejoro el residual, refrescar el Jacobiano la proxima vez
+        if res_new > 0.9*res:
+            refrescar = True
+        res = res_new
+    return X, (res < tol*100)
 
 
 def _tangente(X, z, act, t_prev=None):
