@@ -29,7 +29,6 @@ import math
 from engine3 import (
     NC, TC, PC, OMEGA, KIJ_DEFAULT,
     am, bm, AB, solve_Z, ln_phi_i,
-    _AI, _BI, _MI, _TC as _TC_arr,
 )
 
 R_GAS     = 10.7316
@@ -41,15 +40,6 @@ _max = max  # alias para max escalar (legibilidad)
 # ── Helpers de bajo nivel ────────────────────────────────────────────────────
 def _set_kij(kij):
     global kij_g; kij_g = kij
-
-def _aij_T(T):
-    """Matriz sqrt(ai*alpha_i * aj*alpha_j)*(1-kij) para temperatura T."""
-    al  = (1.0 + _MI*(1.0 - np.sqrt(T/_TC_arr)))**2
-    saa = np.sqrt(_AI*al)                         # sqrt(ai*alpha_i)
-    kij_arr = np.asarray(kij_g)
-    # M_ij = saa_i * saa_j * (1 - kij_ij)
-    M = np.outer(saa, saa) * (1.0 - kij_arr)
-    return M
 
 def _cardano_Z(A, B):
     p2 = -(1.0 - B); p1 = A - 3*B*B - 2*B; p0 = -(A*B - B*B - B**3)

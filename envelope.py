@@ -130,6 +130,86 @@ def goalseek_secant(f, x0, tol=1e-7, max_it=120,
     if x_cur < x_min: return None
     return x_cur if abs(f_cur) < tol*50 else None
 
+
+# ── Factores de compresibilidad de las dos fases (para ϖ = |ZL-ZV|) ──
+def _ZL_ZV(comp_x, comp_y, T, P, kij):
+    """Devuelve (ZL, ZV) usando la composición líquida y vapor del punto."""
+    amL = am(comp_x, T, kij); bmL = bm(comp_x)
+    amV = am(comp_y, T, kij); bmV = bm(comp_y)
+    ZVl, ZLl = solve_Z(*AB(amL, bmL, T, P))   # raíces con mezcla líquida
+    ZVv, ZLv = solve_Z(*AB(amV, bmV, T, P))   # raíces con mezcla vapor
+    return ZLl, ZVv
+
+def _omega_crit(tipo, z, comp_fija, T, P, kij):
+    """ϖ = |ZL - ZV| (criterio de Gallardo para cercanía al punto crítico)."""
+    if tipo == 'B':
+        x, y = list(z), comp_fija       # burbuja: líquido=z, vapor=iterado
+    else:
+        x, y = comp_fija, list(z)       # rocío: vapor=z, líquido=iterado
+    try:
+        ZL, ZV = _ZL_ZV(x, y, T, P, kij)
+        return abs(ZL - ZV)
+    except Exception:
+        return 1.0   # si falla, asumir lejos del crítico
+
+# ── GoalSeek por BISECCIÓN (sin derivada, robusto cerca del crítico) ──
+def goalseek_biseccion(f, x0, x_min, x_max, tol=1e-5, max_it=80,
+                       paso_grueso=None):
+    """
+    Encuentra la raíz de f por bisección. Primero busca un intervalo [a,b]
+    con cambio de signo (búsqueda gruesa desde x0 hacia ambos lados),
+    luego bisecta. No usa derivada: nunca diverge cerca del crítico.
+    """
+    f0 = f(x0)
+    if not np.isfinite(f0): return None
+    if abs(f0) < tol: return x0
+
+    # Paso de búsqueda gruesa proporcional al valor actual
+    if paso_grueso is None:
+        paso_grueso = max(abs(x0)*0.05, 1.0)
+
+    # Buscar intervalo con cambio de signo, expandiendo a ambos lados
+    a, fa = x0, f0
+    b, fb = None, None
+    paso = paso_grueso
+    for _ in range(35):
+        # Probar hacia arriba
+        xb = a + paso
+        if xb <= x_max:
+            fxb = f(xb)
+            if np.isfinite(fxb) and fa*fxb < 0:
+                b, fb = xb, fxb; break
+        # Probar hacia abajo
+        xb2 = a - paso
+        if xb2 >= x_min:
+            fxb2 = f(xb2)
+            if np.isfinite(fxb2) and fa*fxb2 < 0:
+                b, fb = a, fa
+                a, fa = xb2, fxb2
+                break
+        paso *= 1.5
+        if a+paso > x_max and a-paso < x_min:
+            break
+    if b is None:
+        return None   # no se encontró cambio de signo
+
+    # Asegurar a < b
+    if a > b:
+        a, b = b, a; fa, fb = fb, fa
+
+    # Bisección
+    for _ in range(max_it):
+        m = 0.5*(a+b)
+        fm = f(m)
+        if not np.isfinite(fm): return None
+        if abs(fm) < tol or (b-a) < 1e-6:
+            return m
+        if fa*fm < 0:
+            b, fb = m, fm
+        else:
+            a, fa = m, fm
+    return 0.5*(a+b)
+
 # ── Encontrar punto de saturación (réplica EncontrarPuntoSat) ──
 def encontrar_punto(tipo, var_it, T_in, P_in, comp_fija_in, z, kij,
                     tol_comp=1e-9, max_ext=1000):
@@ -149,15 +229,27 @@ def encontrar_punto(tipo, var_it, T_in, P_in, comp_fija_in, z, kij,
     Pc_max = max(PC) * _P_MAX_FACTOR
 
     for _ in range(max_ext):
-        # GoalSeek con composición FIJA y límites físicos
+        # Detectar cercanía al punto crítico: ϖ = |ZL - ZV|
+        omega_c = _omega_crit(tipo, z, comp, T, P, kij)
+        cerca_critico = omega_c <= 0.2
+
+        # GoalSeek con composición FIJA y límites físicos.
+        # Cerca del crítico: BISECCIÓN (sin derivada, no diverge).
+        # Lejos: SECANTE (rápido).
         if var_it == 'P':
             f = lambda p: obj(T, p, z, comp, kij)[0]
-            P_new = goalseek_secant(f, P, x_min=_P_MIN, x_max=Pc_max)
+            if cerca_critico:
+                P_new = goalseek_biseccion(f, P, _P_MIN, Pc_max)
+            else:
+                P_new = goalseek_secant(f, P, x_min=_P_MIN, x_max=Pc_max)
             if P_new is None: return T, P, comp, comp, False
             P = P_new
         else:
             f = lambda t: obj(t, P, z, comp, kij)[0]
-            T_new = goalseek_secant(f, T, x_min=_T_MIN, x_max=Tc_max)
+            if cerca_critico:
+                T_new = goalseek_biseccion(f, T, _T_MIN, Tc_max)
+            else:
+                T_new = goalseek_secant(f, T, x_min=_T_MIN, x_max=Tc_max)
             if T_new is None: return T, P, comp, comp, False
             T = T_new
 
@@ -199,9 +291,9 @@ def crit_check(Ki, th=0.01):
     return sum((k-1)**2 for k in Ki) < th
 
 # ══════════════════════════════════════════════════════════════
-def _curva(tipo, z, kij, dT=5, dP=5, dT_min=1.0, dP_min=1.0,
-           fac=0.5, tol=1e-9, max_it=1000,
-           max_pts=700, crit_th=0.0005, max_int=10, cb=None):
+def _curva(tipo, z, kij, dT=5, dP=5, dT_min=0.3, dP_min=0.3,
+           fac=0.5, tol=1e-9, max_it=400,
+           max_pts=400, crit_th=0.0001, max_int=8, cb=None):
 
     P0 = 10.0
     # T inicial por Newton-Wilson (columna D del Excel)
@@ -559,6 +651,27 @@ def punto_saturacion(tipo_calc, valor, z, kij=None):
 
     return None
 
+
+def _cerrar_por_interseccion(burb, rocio):
+    """
+    Cierra la envolvente uniendo los extremos REALES de ambas ramas.
+    Cuando ambas ramas avanzaron hasta cerca del punto crítico (gracias a
+    la bisección), sus extremos quedan próximos y se conectan con un único
+    segmento recto. Es el caso de 'intersección de las curvas de burbuja y
+    rocío' que describen los papers — sin Bézier ni puntos inventados.
+    El extremo de la rama de rocío se agrega al final de la de burbuja para
+    que el trazado quede cerrado.
+    """
+    if len(burb) < 1 or len(rocio) < 1:
+        return burb, rocio
+    # Punto crítico aproximado = punto medio de los dos extremos reales
+    Pb, Tb = burb[-1]
+    Pd, Td = rocio[-1]
+    Pc = 0.5*(Pb + Pd); Tc = 0.5*(Tb + Td)
+    crit = (Pc, Tc)
+    # Ambas ramas terminan en el mismo punto crítico común
+    return burb + [crit], rocio + [crit]
+
 def curva_envolvente(z,kij=None,progress_cb=None):
     if kij is None: kij=copy.deepcopy(KIJ_DEFAULT)
     def cb_b(n):
@@ -567,6 +680,6 @@ def curva_envolvente(z,kij=None,progress_cb=None):
         if progress_cb: progress_cb('rocio',n)
     pb,cb=curva_burbuja(z,kij,progress_cb=cb_b)
     pd,cd=curva_rocio(z,kij,progress_cb=cb_d)
-    # Cerrar visualmente la envolvente interpolando hacia el punto crítico
-    pb,pd = _cerrar_envolvente(pb, pd)
+    # Cierre por INTERSECCIÓN real de las ramas (punto crítico), no Bézier.
+    pb,pd = _cerrar_por_interseccion(pb, pd)
     return {'burbuja':pb,'rocio':pd,'critico_burbuja':cb,'critico_rocio':cd}

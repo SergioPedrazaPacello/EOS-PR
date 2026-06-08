@@ -5,6 +5,7 @@ Determinación de fase única por criterio ΣKi·zi vs Σzi/Ki (mismo que Excel)
 """
 import numpy as np
 import copy
+import math
 
 R_GAS = 10.7316
 
@@ -101,15 +102,29 @@ def mi(i):      w=OMEGA[i]; return 0.37464+1.54226*w-0.26992*w**2
 def alpha(i,T): return (1+mi(i)*(1-np.sqrt(T/TC[i])))**2
 def ai_alpha(i,T): return ai(i)*alpha(i,T)
 
+# Constantes precomputadas (no dependen de T,P ni composicion)
+_AI = np.array([ai(i) for i in range(NC)])
+_BI = np.array([bi(i) for i in range(NC)])
+_MI = np.array([mi(i) for i in range(NC)])
+_TC = np.array(TC)
+_KIJ_ARR = np.array(KIJ_DEFAULT)
+
+def _ai_alpha_vec(T):
+    """Vector ai*alpha(T) para todos los componentes (vectorizado)."""
+    al = (1.0 + _MI*(1.0 - np.sqrt(T/_TC)))**2
+    return _AI*al
+
 def aij(i,j,T,kij):
     return np.sqrt(ai_alpha(i,T)*ai_alpha(j,T))*(1-kij[i][j])
 
 def am(z,T,kij):
-    s=0.0
-    for i in range(NC):
-        for j in range(NC):
-            s+=z[i]*z[j]*aij(i,j,T,kij)
-    return s
+    # am = sum_i sum_j z_i z_j sqrt(aa_i aa_j)(1-kij_ij), vectorizado.
+    aa = _ai_alpha_vec(T)
+    saa = np.sqrt(aa)
+    w = np.asarray(z)*saa                      # w_i = z_i sqrt(aa_i)
+    kij_arr = kij if isinstance(kij, np.ndarray) else np.asarray(kij)
+    # sum_ij w_i w_j (1-kij) = (sum w)^2 - w^T (kij) w
+    return float(w.sum()**2 - w @ kij_arr @ w)
 
 def bm(z):
     return sum(z[i]*bi(i) for i in range(NC))
@@ -120,23 +135,54 @@ def AB(am_val,bm_val,T,P):
     return A,B
 
 def solve_Z(A,B):
-    roots=np.roots([1,-(1-B),A-3*B**2-2*B,-(A*B-B**2-B**3)])
-    real=[r.real for r in roots if abs(r.imag)<1e-8 and r.real>B]
-    if not real: real=[max(r.real for r in roots)]
-    real=sorted(real)
+    # Solucion analitica de la cubica de PR por Cardano (exacta, ~25x mas
+    # rapida que np.roots, mismas raices). Z^3 + p2 Z^2 + p1 Z + p0 = 0.
+    p2 = -(1.0 - B)
+    p1 = A - 3.0*B*B - 2.0*B
+    p0 = -(A*B - B*B - B*B*B)
+    shift = p2/3.0
+    p = p1 - p2*p2/3.0
+    q = 2.0*p2**3/27.0 - p2*p1/3.0 + p0
+    disc = (q*q)/4.0 + (p*p*p)/27.0
+    if disc > 1e-14:
+        sq = math.sqrt(disc)
+        u = np.cbrt(-q/2.0 + sq)
+        v = np.cbrt(-q/2.0 - sq)
+        raices = [u + v - shift]
+    else:
+        if abs(p) < 1e-30:
+            raices = [-shift]
+        else:
+            mfac = 2.0*math.sqrt(-p/3.0)
+            arg = 3.0*q/(p*mfac)
+            arg = max(-1.0, min(1.0, arg))
+            theta = math.acos(arg)/3.0
+            raices = [mfac*math.cos(theta - 2.0*math.pi*k/3.0) - shift
+                      for k in range(3)]
+    real = [r for r in raices if r > B]
+    if not real:
+        real = [max(raices)]
+    real = sorted(real)
     return real[-1], real[0]  # ZV (mayor), ZL (menor)
 
+_SQRT2 = np.sqrt(2.0)
+
 def ln_phi_i(i,z,T,P,Z,am_val,bm_val,kij):
-    bi_=bi(i); A,B=AB(am_val,bm_val,T,P)
-    sum_aij=sum(z[j]*aij(i,j,T,kij) for j in range(NC))
+    bi_=_BI[i]; A,B=AB(am_val,bm_val,T,P)
+    # sum_aij = sum_j z_j sqrt(aa_i aa_j)(1-kij_ij) = sqrt(aa_i) * sum_j w_j(1-kij_ij)
+    aa = _ai_alpha_vec(T)
+    saa = np.sqrt(aa)
+    w = np.asarray(z)*saa
+    kij_arr = kij if isinstance(kij, np.ndarray) else np.asarray(kij)
+    sum_aij = saa[i]*(w.sum() - (kij_arr[i] @ w))
     if Z<=B: Z=B+1e-12
     t1=(bi_/bm_val)*(Z-1)
     t2=-np.log(Z-B)
-    denom=Z+(1-np.sqrt(2))*B
-    numer=Z+(1+np.sqrt(2))*B
+    denom=Z+(1-_SQRT2)*B
+    numer=Z+(1+_SQRT2)*B
     if denom<=0: denom=1e-12
     if numer<=0: numer=1e-12
-    t3=A/(2*np.sqrt(2)*B)*np.log(numer/denom)
+    t3=A/(2*_SQRT2*B)*np.log(numer/denom)
     t4=(2*sum_aij/am_val-bi_/bm_val)*t3
     return t1+t2-t4
 
