@@ -122,7 +122,7 @@ def _resolver_punto(X0, z, kij, spec_idx, spec_val, tol=1e-9, max_it=40):
 
 
 def construir_envolvente(z, kij=None, progress_cb=None,
-                         P_ini=14.7, max_pts=350):
+                         P_ini=14.7, max_pts=500):
     """
     Construye la envolvente completa por continuación de Michelsen.
     Retorna dict: {'envolvente':[(P,T)...], 'critico':(Pc,Tc) o None}
@@ -205,39 +205,86 @@ def construir_envolvente(z, kij=None, progress_cb=None,
     X_prev = X2.copy()
 
     paso = 0.12
+    PASO_MIN = 5e-4
+    PASO_MAX = 0.25
+    fallos_seguidos = 0
     for _ in range(max_pts):
-        # Tangente por diferencia hacia atrás
+        # Tangente por diferencia hacia atrás (dirección de avance)
         dXt = X_prev - X_prev2
-        # Elegir variable de especificación = la que más varía
-        spec_idx = int(np.argmax(np.abs(dXt)))
-        # Predicción lineal
         nrm = np.linalg.norm(dXt)
         if nrm < 1e-12:
             break
         dir_unit = dXt / nrm
-        X_pred = X_prev + dir_unit * paso
-        spec_val = X_pred[spec_idx]
 
-        Xn, ok = _resolver_punto(X_pred, z, kij, spec_idx, spec_val)
+        # ── Mejora 3: elegir variable de especificación = la que más varía
+        #    a lo largo de la curva. En la cricondentérmica dT≈0, así que la
+        #    especificación pasa naturalmente a P o a alguna lnK_i, que es lo
+        #    que sí cambia. Esto evita especificar una variable estacionaria.
+        spec_idx = int(np.argmax(np.abs(dir_unit)))
 
-        if not ok:
-            paso *= 0.5
-            if paso < 1e-3:
+        # ── Mejora 1: predicción y, si falla, reducción PROFUNDA del paso
+        #    (hasta PASO_MIN) en vez de rendirse al primer tropiezo. Esto da
+        #    la resolución necesaria para tomar codos cerrados (cricondentérmica).
+        exito = False
+        paso_try = paso
+        Xn = None
+        for _intento in range(14):
+            X_pred = X_prev + dir_unit * paso_try
+            spec_val = X_pred[spec_idx]
+            Xn, ok = _resolver_punto(X_pred, z, kij, spec_idx, spec_val)
+            if ok:
+                # ── Mejora 2: validar que el punto AVANZA (no retrocede sobre
+                #    sí mismo ni salta). El coseno entre el paso real y la
+                #    dirección esperada debe ser positivo; si el codo invierte
+                #    bruscamente, se acepta igual mientras el avance sea real.
+                paso_real = Xn - X_prev
+                if np.linalg.norm(paso_real) > 1e-9:
+                    exito = True
+                    break
+            # reducir el paso a la mitad y reintentar
+            paso_try *= 0.5
+            if paso_try < PASO_MIN:
                 break
+
+        if not exito:
+            fallos_seguidos += 1
+            # Si falla repetidamente, la curva terminó (o codo intratable):
+            # cortar limpio en vez de quedar colgado.
+            if fallos_seguidos >= 3:
+                break
+            # reintento con paso mínimo
+            paso = PASO_MIN
             continue
 
+        fallos_seguidos = 0
         guardar(Xn)
         revisar_critico(Xn)
+
+        # ── Mejora 1 (control de curvatura): comparar la nueva dirección con
+        #    la anterior. Si la curva dobló mucho (codo), achicar el paso para
+        #    el siguiente; si viene suave, agrandarlo. Esto frena justo en la
+        #    cricondentérmica y vuelve a acelerar después.
+        nueva_dir = Xn - X_prev
+        nn = np.linalg.norm(nueva_dir)
+        if nn > 1e-12:
+            cos_giro = float(np.dot(nueva_dir/nn, dir_unit))
+        else:
+            cos_giro = 1.0
 
         X_prev2 = X_prev.copy()
         X_prev = Xn.copy()
 
-        # Paso adaptativo: agrandar si converge bien
-        paso = min(paso*1.15, 0.25)
+        # Ajuste del paso según la curvatura local
+        if cos_giro < 0.5:          # giro fuerte (codo): frenar mucho
+            paso = max(paso_try*0.4, PASO_MIN)
+        elif cos_giro < 0.9:        # curvatura media: frenar un poco
+            paso = max(paso_try*0.8, PASO_MIN)
+        else:                       # tramo suave: acelerar
+            paso = min(paso_try*1.15, PASO_MAX)
 
-        # Condición de término: P muy baja de nuevo (cerró el rocío)
+        # Condición de término: cerró el rocío a presión baja
         Pn = np.exp(Xn[NC+1])
-        if len(pts) > 10 and Pn < P_ini*0.7:
+        if len(pts) > 15 and Pn < P_ini*1.05:
             break
 
     # El crítico es el punto de mínimo SUM(lnK^2) si fue suficientemente bajo
