@@ -672,6 +672,58 @@ def _cerrar_por_interseccion(burb, rocio):
     # Ambas ramas terminan en el mismo punto crítico común
     return burb + [crit], rocio + [crit]
 
+def _cerrar_con_michelsen(burb, rocio, z, kij):
+    """
+    Rellena el hueco que Ziervogel deja en el apice con puntos REALES
+    calculados por Michelsen (en vez del cierre geometrico por interseccion).
+    Corre la envolvente de Michelsen, extrae el arco del apice comprendido
+    entre las dos puntas de Ziervogel, y lo divide en lado-burbuja / lado-rocio
+    por la cricondenbarica (presion maxima del arco) para colorearlo coherente.
+    Si Michelsen falla o el hueco es despreciable, recurre al cierre geometrico.
+    """
+    import math
+    if len(burb) < 2 or len(rocio) < 2:
+        return burb, rocio
+    Pb, Tb = burb[-1]; Pd, Td = rocio[-1]
+    gap = math.hypot(Pb-Pd, Tb-Td)
+    if gap < 3.0:
+        # Ya practicamente cerrada: union directa de puntas
+        return _cerrar_por_interseccion(burb, rocio)
+
+    try:
+        from envelope_michelsen import construir_envolvente
+        # Paso grueso: solo necesitamos el arco del ápice para rellenar,
+        # no el detalle fino. Esto acelera bastante el relleno.
+        r = construir_envolvente(list(z), kij, paso_max=0.15)
+        env = r.get('envolvente', [])
+        if not env:
+            return _cerrar_por_interseccion(burb, rocio)
+    except Exception:
+        return _cerrar_por_interseccion(burb, rocio)
+
+    def closest(P, T):
+        return min(range(len(env)),
+                   key=lambda i: (env[i][0]-P)**2 + (env[i][1]-T)**2)
+    i_b = closest(Pb, Tb); i_d = closest(Pd, Td)
+    lo, hi = min(i_b, i_d), max(i_b, i_d)
+    arco = env[lo:hi+1]
+    if len(arco) < 2:
+        return _cerrar_por_interseccion(burb, rocio)
+
+    # Dividir el arco por su punto de presion maxima (cricondenbarica):
+    # tramo ascendente -> lado burbuja, descendente -> lado rocio.
+    imax = max(range(len(arco)), key=lambda i: arco[i][0])
+    side1 = arco[:imax+1]
+    side2 = arco[imax+1:]
+    # Asignar el tramo que arranca cerca de la punta de burbuja a la burbuja
+    d_b = math.hypot(arco[0][0]-Pb, arco[0][1]-Tb)
+    d_d = math.hypot(arco[0][0]-Pd, arco[0][1]-Td)
+    if d_b <= d_d:
+        return burb + side1, rocio + side2
+    else:
+        return burb + side2, rocio + side1
+
+
 def curva_envolvente(z,kij=None,progress_cb=None):
     if kij is None: kij=copy.deepcopy(KIJ_DEFAULT)
     def cb_b(n):
@@ -680,6 +732,6 @@ def curva_envolvente(z,kij=None,progress_cb=None):
         if progress_cb: progress_cb('rocio',n)
     pb,cb=curva_burbuja(z,kij,progress_cb=cb_b)
     pd,cd=curva_rocio(z,kij,progress_cb=cb_d)
-    # Cierre por INTERSECCIÓN real de las ramas (punto crítico), no Bézier.
-    pb,pd = _cerrar_por_interseccion(pb, pd)
+    # Rellenar el hueco del ápice con puntos REALES de Michelsen (no geométrico)
+    pb,pd = _cerrar_con_michelsen(pb, pd, z, kij)
     return {'burbuja':pb,'rocio':pd,'critico_burbuja':cb,'critico_rocio':cd}

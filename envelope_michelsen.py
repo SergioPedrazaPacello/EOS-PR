@@ -310,7 +310,7 @@ def _trazar(X0, z, act, t0, max_pts, paso_ini=0.10,
 
 # ── Punto de entrada principal ───────────────────────────────────────────────
 def construir_envolvente(z, kij=None, progress_cb=None,
-                         P_ini=14.7, max_pts=2000):
+                         P_ini=14.7, max_pts=2000, paso_max=0.10):
     """
     Construye la envolvente completa por continuacion de Michelsen con
     inicializacion BIDIRECCIONAL:
@@ -339,7 +339,7 @@ def construir_envolvente(z, kij=None, progress_cb=None,
     pts1, Xlast1, minK2_1, crit1 = _trazar(
         X1, z, act, t1,
         max_pts=max_pts,
-        paso_ini=0.08, PASO_MAX=0.10,
+        paso_ini=0.08, PASO_MAX=paso_max,
         p_stop_min=P_ini*0.95   # cierre cuando P vuelva a ser baja
     )
     if progress_cb:
@@ -373,7 +373,7 @@ def construir_envolvente(z, kij=None, progress_cb=None,
             pts2a, _, _, _ = _trazar(
                 X2, z, act, t2_up,
                 max_pts=max_pts//3,
-                paso_ini=0.08, PASO_MAX=0.10,
+                paso_ini=0.08, PASO_MAX=paso_max,
                 p_stop_max=P_last1 * 1.15
             )
             # Trazo 2b: bajar hasta presion baja (cola de rocio)
@@ -381,7 +381,7 @@ def construir_envolvente(z, kij=None, progress_cb=None,
             pts2b, _, _, _ = _trazar(
                 X2, z, act, t2_dn,
                 max_pts=max_pts//3,
-                paso_ini=0.08, PASO_MAX=0.10,
+                paso_ini=0.08, PASO_MAX=paso_max,
                 p_stop_min=P_ini * 0.95
             )
             if progress_cb:

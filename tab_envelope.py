@@ -271,8 +271,8 @@ class TabEnvolvente(QWidget):
         if self._punto_usuario is not None:
             Pp, Tp_F = self._punto_usuario
             ax.plot([Tp_F],[Pp],linestyle='none',marker='^',
-                    color='#2d9d2d',markersize=8,
-                    markeredgecolor='#145214',markeredgewidth=0.6,
+                    color='#2d9d2d',markersize=5,
+                    markeredgecolor='#145214',markeredgewidth=0.5,
                     label='Punto', zorder=5)
 
         ax.set_xlabel("Temperatura (°F)", fontsize=9, color=TEXT_DIM)
