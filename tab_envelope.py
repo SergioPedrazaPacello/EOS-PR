@@ -4,7 +4,7 @@ Mismo estilo (Arial Narrow) que el resto del programa.
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QFrame, QSizePolicy, QProgressBar, QGridLayout
+    QFrame, QSizePolicy, QProgressBar, QGridLayout, QLineEdit
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
@@ -35,7 +35,7 @@ LBL_RES=(f'background:{GRAY_RES};border:1px solid {BORDER};'
 
 class EnvWorker(QThread):
     done=pyqtSignal(dict); error=pyqtSignal(str)
-    def __init__(self, z, kij, metodo='ziervogel', max_pts=2000):
+    def __init__(self, z, kij, metodo='ziervogel', max_pts=10000):
         super().__init__(); self.z=z; self.kij=kij; self.metodo=metodo
         self.max_pts=max_pts
     def run(self):
@@ -106,6 +106,8 @@ class TabEnvolvente(QWidget):
         # Cursor interactivo: muestra P y T en la posición del mouse
         self._hover_annot = None
         self.canvas.mpl_connect('motion_notify_event', self._on_hover)
+        # Punto marcado por el usuario (P_psia, T_F) o None
+        self._punto_usuario = None
 
         content.addWidget(self.left_box, stretch=1)
 
@@ -128,24 +130,6 @@ class TabEnvolvente(QWidget):
             f'QComboBox {{ background:{WHITE};border:1px solid {BORDER};'
             f'color:{TEXT};font-family:"{FONT_F}";font-size:{FS}pt; padding:1px 4px; }}')
         vr.addWidget(self.cmb_metodo)
-
-        # Control de puntos maximos (solo aplica a Michelsen)
-        from PyQt6.QtWidgets import QSpinBox
-        pts_lbl=QLabel("Puntos max (Michelsen):")
-        pts_lbl.setStyleSheet(
-            f'font-family:"{FONT_F}";font-size:{FS}pt;color:{TEXT};'
-            f'background:transparent;')
-        pts_lbl.setFixedHeight(16)
-        vr.addWidget(pts_lbl)
-        self.spin_pts=QSpinBox()
-        self.spin_pts.setRange(200, 10000)
-        self.spin_pts.setSingleStep(500)
-        self.spin_pts.setValue(2000)
-        self.spin_pts.setFixedHeight(24)
-        self.spin_pts.setStyleSheet(
-            f'QSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
-            f'color:{TEXT};font-family:"{FONT_F}";font-size:{FS}pt; padding:1px 4px; }}')
-        vr.addWidget(self.spin_pts)
 
         self.btn=QPushButton("Calcular Envolvente")
         self.btn.setStyleSheet(BTN_STYLE); self.btn.setFixedHeight(30)
@@ -190,6 +174,40 @@ class TabEnvolvente(QWidget):
             rv=res_val(); self.res_labels[key]=rv
             grid.addWidget(rv,r,1)
         vr.addLayout(grid)
+
+        # ── Sección: marcar un punto en el gráfico (triángulo verde) ──
+        sep2=QFrame(); sep2.setFrameShape(QFrame.Shape.HLine)
+        sep2.setStyleSheet(f'color:{BORDER};')
+        vr.addWidget(sep2)
+        pt_title=QLabel("Marcar punto:")
+        pt_title.setStyleSheet(LBL_SEC); pt_title.setFixedHeight(22)
+        vr.addWidget(pt_title)
+
+        gp=QGridLayout(); gp.setSpacing(4); gp.setContentsMargins(0,2,0,0)
+        ed_style=(f'QLineEdit {{ background:{WHITE};border:1px solid {BORDER};'
+                  f'color:{TEXT};font-family:"{FONT_F}";font-size:{FS}pt;'
+                  f'padding:1px 4px; }}')
+        lblP=QLabel("Presión (psia):"); lblP.setStyleSheet(lbl_style)
+        self.ed_pP=QLineEdit(); self.ed_pP.setStyleSheet(ed_style)
+        self.ed_pP.setFixedHeight(22)
+        gp.addWidget(lblP,0,0); gp.addWidget(self.ed_pP,0,1)
+        lblT=QLabel("Temperatura (°F):"); lblT.setStyleSheet(lbl_style)
+        self.ed_pT=QLineEdit(); self.ed_pT.setStyleSheet(ed_style)
+        self.ed_pT.setFixedHeight(22)
+        gp.addWidget(lblT,1,0); gp.addWidget(self.ed_pT,1,1)
+        vr.addLayout(gp)
+
+        hb_pt=QHBoxLayout(); hb_pt.setSpacing(4)
+        self.btn_pt=QPushButton("Colocar")
+        self.btn_pt.setStyleSheet(BTN_STYLE); self.btn_pt.setFixedHeight(26)
+        self.btn_pt.clicked.connect(self._colocar_punto)
+        hb_pt.addWidget(self.btn_pt)
+        self.btn_pt_clear=QPushButton("Quitar")
+        self.btn_pt_clear.setStyleSheet(BTN_STYLE); self.btn_pt_clear.setFixedHeight(26)
+        self.btn_pt_clear.clicked.connect(self._quitar_punto)
+        hb_pt.addWidget(self.btn_pt_clear)
+        vr.addLayout(hb_pt)
+
         vr.addStretch()
 
         self.btn_exp=QPushButton("Exportar CSV")
@@ -210,10 +228,9 @@ class TabEnvolvente(QWidget):
             return
         kij=self.get_kij()
         metodo = 'michelsen' if self.cmb_metodo.currentIndex()==1 else 'ziervogel'
-        max_pts = self.spin_pts.value()
         self.btn.setEnabled(False); self.btn.setText("Calculando...")
         self.prog.setVisible(True)
-        self.worker=EnvWorker(z,kij,metodo,max_pts)
+        self.worker=EnvWorker(z,kij,metodo,max_pts=10000)
         self.worker.done.connect(self._on_done)
         self.worker.error.connect(self._on_error)
         self.worker.start()
@@ -250,6 +267,14 @@ class TabEnvolvente(QWidget):
                     color='#1a4fa8',markersize=3,
                     label='Curva de Rocío')
 
+        # Punto marcado por el usuario (triángulo verde)
+        if self._punto_usuario is not None:
+            Pp, Tp_F = self._punto_usuario
+            ax.plot([Tp_F],[Pp],linestyle='none',marker='^',
+                    color='#2d9d2d',markersize=8,
+                    markeredgecolor='#145214',markeredgewidth=0.6,
+                    label='Punto', zorder=5)
+
         ax.set_xlabel("Temperatura (°F)", fontsize=9, color=TEXT_DIM)
         ax.set_ylabel("Presión (psia)", fontsize=9, color=TEXT_DIM)
 
@@ -261,6 +286,33 @@ class TabEnvolvente(QWidget):
         ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
         ax.set_position([0.14, 0.09, 0.83, 0.88])
         self.canvas.draw_idle()
+
+    def _colocar_punto(self):
+        """Lee P (psia) y T (°F) de los campos y marca un triángulo verde."""
+        from PyQt6.QtWidgets import QMessageBox
+        try:
+            Pp = float(self.ed_pP.text().replace(',', '.'))
+            Tp = float(self.ed_pT.text().replace(',', '.'))
+        except ValueError:
+            QMessageBox.warning(self, "Punto",
+                "Ingrese valores numéricos válidos de presión y temperatura.")
+            return
+        self._punto_usuario = (Pp, Tp)
+        # Redibujar si ya hay una envolvente calculada
+        if self.result is not None:
+            self._plot(self.result)
+        else:
+            # Si no hay envolvente, igual mostrar el punto solo
+            self.canvas.setVisible(True)
+            self._plot({'burbuja': [], 'rocio': []})
+
+    def _quitar_punto(self):
+        """Quita el punto marcado y redibuja."""
+        self._punto_usuario = None
+        if self.result is not None:
+            self._plot(self.result)
+        else:
+            self._plot({'burbuja': [], 'rocio': []})
 
     def _on_hover(self, event):
         # Solo si hay datos y el cursor está dentro del área de trazado
