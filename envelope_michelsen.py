@@ -310,7 +310,7 @@ def _trazar(X0, z, act, t0, max_pts, paso_ini=0.10,
 
 # ── Punto de entrada principal ───────────────────────────────────────────────
 def construir_envolvente(z, kij=None, progress_cb=None,
-                         P_ini=14.7, max_pts=800):
+                         P_ini=14.7, max_pts=2000):
     """
     Construye la envolvente completa por continuacion de Michelsen con
     inicializacion BIDIRECCIONAL:
@@ -347,6 +347,13 @@ def construir_envolvente(z, kij=None, progress_cb=None,
 
     crit = crit1 if minK2_1 < 0.5 else None
     P_last1 = pts1[-1][0]   # presion del ultimo punto del trazo 1
+
+    # ¿El Trazo 1 ya completó la envolvente (llegó a presión baja en rocío)?
+    # Si si, no hace falta el Trazo 2 (evita trabajo redundante → más rápido).
+    # Solo gases donde la continuación se atasca en el pliegue de rocío
+    # (tipicamente ultralivianos) necesitan el Trazo 2.
+    if P_last1 <= P_ini * 2.5:
+        return {'envolvente': pts1, 'critico': crit}
 
     # ── TRAZO 2: bidireccional desde punto de rocio intermedio ─────────────
     # Inicializa en una presion intermedia (~200→20 psi) donde la EOS es

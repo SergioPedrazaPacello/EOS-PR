@@ -35,13 +35,14 @@ LBL_RES=(f'background:{GRAY_RES};border:1px solid {BORDER};'
 
 class EnvWorker(QThread):
     done=pyqtSignal(dict); error=pyqtSignal(str)
-    def __init__(self, z, kij, metodo='ziervogel'):
+    def __init__(self, z, kij, metodo='ziervogel', max_pts=2000):
         super().__init__(); self.z=z; self.kij=kij; self.metodo=metodo
+        self.max_pts=max_pts
     def run(self):
         try:
             if self.metodo=='michelsen':
                 from envelope_michelsen import construir_envolvente
-                r=construir_envolvente(self.z, self.kij)
+                r=construir_envolvente(self.z, self.kij, max_pts=self.max_pts)
                 env=r.get('envolvente',[]); crit=r.get('critico')
                 # Partir el trazo continuo en burbuja/rocío en el punto crítico
                 if crit is not None and env:
@@ -128,6 +129,24 @@ class TabEnvolvente(QWidget):
             f'color:{TEXT};font-family:"{FONT_F}";font-size:{FS}pt; padding:1px 4px; }}')
         vr.addWidget(self.cmb_metodo)
 
+        # Control de puntos maximos (solo aplica a Michelsen)
+        from PyQt6.QtWidgets import QSpinBox
+        pts_lbl=QLabel("Puntos max (Michelsen):")
+        pts_lbl.setStyleSheet(
+            f'font-family:"{FONT_F}";font-size:{FS}pt;color:{TEXT};'
+            f'background:transparent;')
+        pts_lbl.setFixedHeight(16)
+        vr.addWidget(pts_lbl)
+        self.spin_pts=QSpinBox()
+        self.spin_pts.setRange(200, 10000)
+        self.spin_pts.setSingleStep(500)
+        self.spin_pts.setValue(2000)
+        self.spin_pts.setFixedHeight(24)
+        self.spin_pts.setStyleSheet(
+            f'QSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
+            f'color:{TEXT};font-family:"{FONT_F}";font-size:{FS}pt; padding:1px 4px; }}')
+        vr.addWidget(self.spin_pts)
+
         self.btn=QPushButton("Calcular Envolvente")
         self.btn.setStyleSheet(BTN_STYLE); self.btn.setFixedHeight(30)
         self.btn.clicked.connect(self.calcular)
@@ -191,9 +210,10 @@ class TabEnvolvente(QWidget):
             return
         kij=self.get_kij()
         metodo = 'michelsen' if self.cmb_metodo.currentIndex()==1 else 'ziervogel'
+        max_pts = self.spin_pts.value()
         self.btn.setEnabled(False); self.btn.setText("Calculando...")
         self.prog.setVisible(True)
-        self.worker=EnvWorker(z,kij,metodo)
+        self.worker=EnvWorker(z,kij,metodo,max_pts)
         self.worker.done.connect(self._on_done)
         self.worker.error.connect(self._on_error)
         self.worker.start()
