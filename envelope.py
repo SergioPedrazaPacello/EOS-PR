@@ -724,7 +724,16 @@ def _cerrar_con_michelsen(burb, rocio, z, kij):
         return burb + side2, rocio + side1
 
 
-def curva_envolvente(z,kij=None,progress_cb=None):
+def curva_envolvente(z,kij=None,progress_cb=None,tol_cierre=15.0):
+    """
+    Calcula la envolvente por Ziervogel. Mide el hueco en el punto crítico
+    (distancia entre las puntas de burbuja y rocío). Si el hueco está dentro
+    de la tolerancia de cierre, MANTIENE la envolvente de Ziervogel (cerrando
+    las puntas). Si NO cierra dentro de tolerancia, DESCARTA los puntos de
+    Ziervogel y devuelve la envolvente COMPLETA calculada por Michelsen,
+    partida en burbuja/rocío en el crítico.
+    """
+    import math
     if kij is None: kij=copy.deepcopy(KIJ_DEFAULT)
     def cb_b(n):
         if progress_cb: progress_cb('burbuja',n)
@@ -732,6 +741,40 @@ def curva_envolvente(z,kij=None,progress_cb=None):
         if progress_cb: progress_cb('rocio',n)
     pb,cb=curva_burbuja(z,kij,progress_cb=cb_b)
     pd,cd=curva_rocio(z,kij,progress_cb=cb_d)
-    # Rellenar el hueco del ápice con puntos REALES de Michelsen (no geométrico)
-    pb,pd = _cerrar_con_michelsen(pb, pd, z, kij)
-    return {'burbuja':pb,'rocio':pd,'critico_burbuja':cb,'critico_rocio':cd}
+
+    # Hueco en el crítico = distancia entre las puntas de ambas ramas
+    if pb and pd:
+        gap = math.hypot(pb[-1][0]-pd[-1][0], pb[-1][1]-pd[-1][1])
+    else:
+        gap = float('inf')
+
+    if gap <= tol_cierre:
+        # Ziervogel cierra bien: mantener su envolvente, unir las puntas
+        pb,pd = _cerrar_por_interseccion(pb, pd)
+        return {'burbuja':pb,'rocio':pd,
+                'critico_burbuja':cb,'critico_rocio':cd,'metodo':'ziervogel'}
+
+    # No cierra dentro de tolerancia: descartar Ziervogel y usar Michelsen
+    try:
+        from envelope_michelsen import construir_envolvente
+        # Normalizacion defensiva (la EOS y la deteccion del critico asumen sum(z)=1)
+        sz = sum(z)
+        z_norm = [zi/sz for zi in z] if sz > 0 else list(z)
+        r = construir_envolvente(z_norm, kij)
+        env = r.get('envolvente', [])
+        crit = r.get('critico')
+        if env and crit is not None:
+            # Partir el trazo continuo de Michelsen en burbuja/rocío en el crítico
+            ic = min(range(len(env)),
+                     key=lambda i:(env[i][0]-crit[0])**2+(env[i][1]-crit[1])**2)
+            burb_m = env[:ic+1]
+            rocio_m = env[ic:]
+            return {'burbuja':burb_m,'rocio':rocio_m,
+                    'critico_burbuja':True,'critico_rocio':True,'metodo':'michelsen'}
+    except Exception:
+        pass
+
+    # Respaldo: si Michelsen falla, cerrar Ziervogel geométricamente
+    pb,pd = _cerrar_por_interseccion(pb, pd)
+    return {'burbuja':pb,'rocio':pd,
+            'critico_burbuja':cb,'critico_rocio':cd,'metodo':'ziervogel-fallback'}
