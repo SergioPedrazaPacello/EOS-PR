@@ -208,6 +208,47 @@ class TabEnvolvente(QWidget):
         hb_pt.addWidget(self.btn_pt_clear)
         vr.addLayout(hb_pt)
 
+        # ── Sección: Hidratos (Ng-Robinson, free water) ──
+        seph=QFrame(); seph.setFrameShape(QFrame.Shape.HLine)
+        seph.setStyleSheet(f'color:{BORDER};')
+        vr.addWidget(seph)
+        h_title=QLabel("Hidratos (Ng-Robinson):")
+        h_title.setStyleSheet(LBL_SEC); h_title.setFixedHeight(22)
+        vr.addWidget(h_title)
+
+        gh=QGridLayout(); gh.setSpacing(4); gh.setContentsMargins(0,2,0,0)
+        ed_style2=(f'QLineEdit {{ background:{WHITE};border:1px solid {BORDER};'
+                   f'color:{TEXT};font-family:"{FONT_F}";font-size:{FS}pt;'
+                   f'padding:1px 4px; }}')
+        lblHP=QLabel("Presión (psia):"); lblHP.setStyleSheet(lbl_style)
+        self.ed_hP=QLineEdit(); self.ed_hP.setStyleSheet(ed_style2); self.ed_hP.setFixedHeight(22)
+        gh.addWidget(lblHP,0,0); gh.addWidget(self.ed_hP,0,1)
+        lblHT=QLabel("Temperatura (°F):"); lblHT.setStyleSheet(lbl_style)
+        self.ed_hT=QLineEdit(); self.ed_hT.setStyleSheet(ed_style2); self.ed_hT.setFixedHeight(22)
+        gh.addWidget(lblHT,1,0); gh.addWidget(self.ed_hT,1,1)
+        vr.addLayout(gh)
+
+        self.btn_hid=QPushButton("Calcular hidratos")
+        self.btn_hid.setStyleSheet(BTN_STYLE); self.btn_hid.setFixedHeight(26)
+        self.btn_hid.clicked.connect(self._calcular_hidratos)
+        vr.addWidget(self.btn_hid)
+
+        # Etiquetas de resultados de hidratos
+        gh2=QGridLayout(); gh2.setSpacing(2); gh2.setContentsMargins(0,2,0,0)
+        self.hid_labels={}
+        hid_items=[("T de formación (@P):","Tf"),("P de formación (@T):","Pf"),
+                   ("Estructura:","estr"),("Equilibrio:","eq"),("¿Forma hidrato?:","forma")]
+        for r,(txt,key) in enumerate(hid_items):
+            lb=QLabel(txt); lb.setStyleSheet(lbl_style); lb.setWordWrap(True)
+            gh2.addWidget(lb,r,0)
+            vv=QLabel("—")
+            vv.setStyleSheet(f'background:{GRAY_RES};color:{TEXT_RES};'
+                             f'border:1px solid {BORDER};font-family:"{FONT_F}";'
+                             f'font-size:{FS}pt;padding:1px 4px;')
+            vv.setWordWrap(True); self.hid_labels[key]=vv
+            gh2.addWidget(vv,r,1)
+        vr.addLayout(gh2)
+
         vr.addStretch()
 
         self.btn_exp=QPushButton("Exportar CSV")
@@ -313,6 +354,40 @@ class TabEnvolvente(QWidget):
             self._plot(self.result)
         else:
             self._plot({'burbuja': [], 'rocio': []})
+
+    def _calcular_hidratos(self):
+        """Calcula formación de hidratos (Ng-Robinson, free water) en la
+        condición ingresada y reporta T/P de formación, estructura, equilibrio
+        y si forma o no forma hidrato."""
+        from PyQt6.QtWidgets import QMessageBox
+        try:
+            P = float(self.ed_hP.text().replace(',', '.'))
+            T_F = float(self.ed_hT.text().replace(',', '.'))
+        except ValueError:
+            QMessageBox.warning(self, "Hidratos",
+                "Ingrese valores numéricos válidos de presión y temperatura.")
+            return
+        T_R = T_F + 459.67
+        try:
+            import hydrates
+            z = self.get_z(); kij = self.get_kij()
+            r = hydrates.evaluar(z, T_R, P, kij)
+        except Exception as e:
+            QMessageBox.warning(self, "Hidratos", f"No se pudo calcular: {e}")
+            return
+        # Volcar resultados
+        if r['T_form_F'] is not None:
+            self.hid_labels['Tf'].setText(f"{r['T_form_F']:.2f} °F  ({r['T_form_R']:.2f} °R)")
+        else:
+            self.hid_labels['Tf'].setText("no forma en rango")
+        if r['P_form_psia'] is not None:
+            nota = "  (región hielo, aprox.)" if T_F < 32.0 else ""
+            self.hid_labels['Pf'].setText(f"{r['P_form_psia']:.2f} psia{nota}")
+        else:
+            self.hid_labels['Pf'].setText("no forma en rango")
+        self.hid_labels['estr'].setText(f"Tipo {r['estructura']}" if r['estructura'] else "—")
+        self.hid_labels['eq'].setText(r['equilibrio'] or "—")
+        self.hid_labels['forma'].setText("SÍ forma hidrato" if r['forma'] else "NO forma hidrato")
 
     def _on_hover(self, event):
         # Solo si hay datos y el cursor está dentro del área de trazado
